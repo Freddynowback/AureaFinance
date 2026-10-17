@@ -1,45 +1,32 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
+ * Aurea Finance — punto de entrada.
+ * Solo configura los proveedores globales y renderiza el menú principal.
  */
+import React from 'react';
+import { StatusBar, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { DatabaseProvider } from './hooks/DatabaseProvider';
+import { ToastProvider } from './components/common/Toast';
+import BootScreen from './components/BootScreen';
+import LockGate from './components/LockGate';
+import MENU from './MENUS/MENU';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
-
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
-
+export default function App() {
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <DatabaseProvider fallback={<BootScreen />} renderError={(e: Error) => <BootScreen error={e} />}>
+          <ToastProvider>
+            <LockGate>
+              <MENU />
+            </LockGate>
+          </ToastProvider>
+        </DatabaseProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
-
-export default App;
+const styles = StyleSheet.create({ root: { flex: 1, backgroundColor: '#101419' } });

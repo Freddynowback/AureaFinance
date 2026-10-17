@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">AureaFinance</string>
+    <!-- Nombre visible en el lanzador. Cambiar también en config/brand.js. -->
+    <string name="app_name">Aurea Finance</string>
 </resources>

@@ -1,0 +1,38 @@
+/**
+ * Preferencias por defecto. Se guardan en la tabla `settings` como JSON.
+ */
+export const DEFAULT_SETTINGS = {
+  'period.type': 'weekly',
+  'period.weekStartDay': 1,
+  'period.biweeklyMode': 'calendar',
+  'period.biweeklyAnchor': null,
+  'period.monthStartDay': 1,
+  'period.customStart': null,
+  'period.customEnd': null,
+  // Base del "restante" del círculo: 'auto' | 'income' | 'budget'
+  'circle.remainingBase': 'auto',
+  'currency.default': 'MXN',
+  'onboarding.done': false,
+  'security.biometricEnabled': false,
+  'security.graceSeconds': 30,
+  'notifications.enabled': false,
+  'notifications.budget': true,
+  'notifications.lowRemaining': true,
+  'notifications.lowRemainingPercent': 20,
+  'notifications.cardDue': true,
+  'notifications.debtDue': true,
+  'notifications.expectedIncome': true,
+  'notifications.recurringExpense': true,
+  'notifications.daysBefore': 2,
+  'notifications.hour': 9,
+  'notifications.dailyReminder': false,
+  'notifications.dailyReminderHour': 21,
+  'ui.reduceMotion': false,
+  'ai.enabled': false,
+  'ai.endpoint': '',
+  'ai.accessToken': '',
+  'ai.maxResponseTokens': 300,
+  'ai.monthlyRequestLimit': 30,
+  'ai.requestsThisMonth': 0,
+  'ai.requestsMonth': '',
+};
