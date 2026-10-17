@@ -9,7 +9,7 @@ petición del usuario. Lo único que falta es tu clave de firma.
 |---|---|
 | Nombre visible | "Aurea Finance" (`android/app/src/main/res/values/strings.xml`) |
 | Paquete | `com.aureafinance` |
-| Versión | `versionCode 1`, `versionName "1.0.0"` (`android/app/build.gradle`) |
+| Versión | `versionCode 1`, `versionName "0.01"` (`android/app/build.gradle`) |
 | Icono | Generado: neón azul-morado. Hay versión clásica, redonda, adaptativa (Android 8+) con capa monocroma, y 512 px para la tienda (`assets/brand/playstore-512.png`) |
 | Firma release | Configurada para leer **tu** clave privada de `~/.gradle/gradle.properties`. Nunca usa la clave de depuración |
 | Permisos release | INTERNET, USE_BIOMETRIC, POST_NOTIFICATIONS, RECEIVE_BOOT_COMPLETED, WAKE_LOCK, VIBRATE |
