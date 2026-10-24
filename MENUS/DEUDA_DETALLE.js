@@ -12,6 +12,7 @@ import { useSubmit } from '../hooks/useSubmit';
 import { accountsRepository } from '../database/repositories/accountsRepository';
 import { deleteDebt, FINANCING_LABELS, getDebtDetail, reconcileDebt, registerDebtPayment, reserveForDebt, updateDebt } from '../services/debts/debtService';
 import { buildDebtContext } from '../services/debts/debtContext';
+import { pendingInstallments } from '../services/debts/recommender';
 import { refreshScheduledNotifications } from '../services/notifications/notificationService';
 import { formatDate, formatDateTime, nowDateTime, todayISO } from '../utils/dates';
 import { formatMoney } from '../utils/money';
@@ -31,11 +32,17 @@ import TextField from '../components/common/TextField';
 import LineChart from '../components/charts/LineChart';
 import DebtPaymentPlan from '../components/DebtPaymentPlan';
 
+// El plan de pagos llega hasta la última mensualidad; sin mensualidades, al próximo vencimiento.
+function lastInstallmentDate(debt) {
+  const items = pendingInstallments(debt);
+  return items ? items[items.length - 1].date : debt.effectiveDueDate;
+}
+
 async function load(db, id) {
   const detail = await getDebtDetail(db, id);
   if (!detail) return null;
   const [context, accounts] = await Promise.all([
-    buildDebtContext(db, id, { deadline: detail.debt.schedule && detail.debt.schedule.pending.length ? detail.debt.schedule.pending[detail.debt.schedule.pending.length - 1].due_date : detail.debt.effectiveDueDate }),
+    buildDebtContext(db, id, { deadline: lastInstallmentDate(detail.debt) }),
     accountsRepository.list(db),
   ]);
   return { ...detail, context, payFrom: accounts.filter(a => a.type !== 'credit') };

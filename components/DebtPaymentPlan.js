@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { addDays, formatDate, todayISO } from '../utils/dates';
-import { assessPlan, comparePlans, planFromAmount } from '../services/debts/recommender';
+import { assessPlan, compareInstallmentPlans, comparePlans, pendingInstallments, planFromAmount } from '../services/debts/recommender';
 import { colors, spacing } from '../config/theme';
 import { formatMoney } from '../utils/money';
 import AppText from './common/AppText';
@@ -15,6 +15,11 @@ const FREQUENCY_OPTIONS = [
   { value: 'weekly', label: 'Semanal' },
   { value: 'biweekly', label: 'Quincenal' },
   { value: 'monthly', label: 'Mensual' },
+];
+
+const GOAL_OPTIONS = [
+  { value: 'installments', label: 'Mensualidades' },
+  { value: 'deadline', label: 'Liquidar antes' },
 ];
 
 const safeAmount = value => (Number.isSafeInteger(value) ? value : 0);
@@ -63,17 +68,24 @@ export default function DebtPaymentPlan({ debt, today, context, onRegisterPaymen
   const outstanding = safeAmount(debt.outstanding);
   const reserved = safeAmount(debt.reserved);
   const paidTotal = safeAmount(debt.paid_total);
-  // Con calendario, el plan termina en el último mes capturado, no en el del mes en curso.
-  const lastScheduled = debt.schedule && debt.schedule.pending.length ? debt.schedule.pending[debt.schedule.pending.length - 1].due_date : null;
-  const initialDeadline = lastScheduled || debt.effectiveDueDate || addDays(currentDay, 30);
-  const [deadline, setDeadline] = useState(initialDeadline);
+  // Mensualidades capturadas (pago fijo o calendario): cada una se reparte antes de su fecha.
+  const installments = useMemo(() => pendingInstallments(debt), [debt]);
+  const lastInstallment = installments ? installments[installments.length - 1].date : null;
+  const initialDeadline = lastInstallment || debt.effectiveDueDate || addDays(currentDay, 30);
+  const [goal, setGoal] = useState(installments ? 'installments' : 'deadline');
+  const byInstallments = goal === 'installments' && !!installments;
+  const [chosenDeadline, setDeadline] = useState(initialDeadline);
+  const deadline = byInstallments ? lastInstallment : chosenDeadline;
   const [frequency, setFrequency] = useState('monthly');
   const [selectedFrequency, setSelectedFrequency] = useState('monthly');
   const [comfortAmount, setComfortAmount] = useState(null);
 
   const plans = useMemo(
-    () => comparePlans({ outstanding, reserved, today: currentDay, deadline }),
-    [outstanding, reserved, currentDay, deadline],
+    () =>
+      byInstallments
+        ? compareInstallmentPlans({ installments, reserved, today: currentDay })
+        : comparePlans({ outstanding, reserved, today: currentDay, deadline }),
+    [byInstallments, installments, outstanding, reserved, currentDay, deadline],
   );
 
   const planByFrequency = useMemo(
@@ -96,8 +108,9 @@ export default function DebtPaymentPlan({ debt, today, context, onRegisterPaymen
       deadline,
       frequency,
       amountPerPeriod: comfortAmount,
+      installments: byInstallments ? installments : null,
     });
-  }, [comfortAmount, outstanding, reserved, currentDay, deadline, frequency]);
+  }, [comfortAmount, outstanding, reserved, currentDay, deadline, frequency, byInstallments, installments]);
 
   const hasDebt = outstanding > 0;
   const reserveAmount = selectedPlan ? selectedPlan.perPeriod : 0;
@@ -122,7 +135,14 @@ export default function DebtPaymentPlan({ debt, today, context, onRegisterPaymen
         La recomendación es una guía: no crea pagos ni modifica lo apartado o lo pendiente.
       </AppText>
 
-      <DateTimeField label="Fecha límite" value={deadline} onChange={setDeadline} mode="date" />
+      {installments ? <Segmented options={GOAL_OPTIONS} value={goal} onChange={setGoal} style={styles.segmented} /> : null}
+      {byInstallments ? (
+        <AppText variant="caption" color={colors.textSecondary} style={styles.explanation}>
+          Reparte cada mensualidad para tenerla lista en su fecha de pago. Última: {formatDate(lastInstallment)}.
+        </AppText>
+      ) : (
+        <DateTimeField label="Fecha límite" value={deadline} onChange={setDeadline} mode="date" />
+      )}
       <Segmented options={FREQUENCY_OPTIONS} value={frequency} onChange={selectFrequency} style={styles.segmented} />
 
       <AppText variant="subtitle" style={styles.heading}>Elige un plan</AppText>
@@ -148,6 +168,11 @@ export default function DebtPaymentPlan({ debt, today, context, onRegisterPaymen
               <AppText variant="caption" color={colors.textSecondary}>
                 {plan.perLabel} · {plan.periods} {plan.periods === 1 ? 'periodo' : 'periodos'}
               </AppText>
+              {plan.firstDue && plan.firstDue.amount !== plan.perPeriod ? (
+                <AppText variant="caption" color={colors.gold}>
+                  Para el {formatDate(plan.firstDue.date)}: {plan.firstDue.count} × {formatMoney(plan.firstDue.amount)} (queda menos tiempo)
+                </AppText>
+              ) : null}
             </Card>
           );
         })}
@@ -181,7 +206,11 @@ export default function DebtPaymentPlan({ debt, today, context, onRegisterPaymen
               <AppText variant="small" color={colors.textSecondary}>Terminas el</AppText>
               <AppText variant="small">{formatDate(comfortPlan.finishDate, { withWeekday: true })}</AppText>
             </View>
-            {!comfortPlan.meetsDeadline ? (
+            {comfortPlan.missedInstallment ? (
+              <AppText variant="small" color={colors.coral} style={styles.notice}>
+                No alcanza para la mensualidad del {formatDate(comfortPlan.missedInstallment.date)}.
+              </AppText>
+            ) : !comfortPlan.meetsDeadline ? (
               <AppText variant="small" color={colors.coral} style={styles.notice}>
                 Esta cantidad no alcanza la fecha límite del {formatDate(deadline)}.
               </AppText>

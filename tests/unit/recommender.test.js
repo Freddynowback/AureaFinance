@@ -1,7 +1,10 @@
 import {
   assessPlan,
+  buildInstallmentPlan,
   buildPlan,
+  compareInstallmentPlans,
   comparePlans,
+  pendingInstallments,
   planFromAmount,
 } from '../../services/debts/recommender';
 
@@ -186,5 +189,70 @@ describe('assessPlan', () => {
     const result = assessPlan(plan, {}, TODAY);
 
     expect(result.notes.join(' ')).toMatch(/No se consideran intereses/i);
+  });
+});
+
+describe('mensualidades', () => {
+  const today = '2026-10-01';
+  const fixed = { outstanding: 120000, monthly_payment: 40000, monthlyDue: 40000, next_due_date: '2026-11-01', effectiveDueDate: '2026-11-01', schedule: null };
+
+  test('pendingInstallments: pago fijo mes a mes hasta cubrir el saldo, el último puede ser menor', () => {
+    expect(pendingInstallments({ ...fixed, outstanding: 100000 })).toEqual([
+      { date: '2026-11-01', amount: 40000 },
+      { date: '2026-12-01', amount: 40000 },
+      { date: '2027-01-01', amount: 20000 },
+    ]);
+    expect(pendingInstallments({ ...fixed, monthly_payment: null, monthlyDue: null })).toBeNull();
+  });
+
+  test('$400 al mes = $400 mensual, $200 por quincena, $100 por semana (no liquidar todo)', () => {
+    const installments = pendingInstallments(fixed);
+    const [weekly, biweekly, monthly] = compareInstallmentPlans({ installments, today });
+    expect(monthly).toMatchObject({ perPeriod: 40000, periods: 3, total: 120000 });
+    expect(biweekly).toMatchObject({ perPeriod: 20000, periods: 6, total: 120000 });
+    expect(weekly).toMatchObject({ perPeriod: 10000, periods: 12, total: 120000 });
+    expect(weekly.schedule.slice(0, 4)).toEqual([
+      { date: '2026-10-11', amount: 10000 },
+      { date: '2026-10-18', amount: 10000 },
+      { date: '2026-10-25', amount: 10000 },
+      { date: '2026-11-01', amount: 10000 },
+    ]);
+    expect(weekly.firstDue).toEqual({ date: '2026-11-01', count: 4, amount: 10000 });
+  });
+
+  test('si queda poco para la primera mensualidad, sus aportaciones son menos y más altas', () => {
+    const plan = buildInstallmentPlan({ installments: pendingInstallments(fixed), today: '2026-10-24', frequency: 'weekly' });
+    expect(plan.schedule.slice(0, 2)).toEqual([
+      { date: '2026-10-25', amount: 20000 },
+      { date: '2026-11-01', amount: 20000 },
+    ]);
+    expect(plan.perPeriod).toBe(10000);
+    expect(plan.firstDue).toEqual({ date: '2026-11-01', count: 2, amount: 20000 });
+  });
+
+  test('calendario con montos distintos y apartado aplicado a la mensualidad más próxima', () => {
+    const debt = { schedule: { pending: [{ due_date: '2026-11-05', amount: 125000 }, { due_date: '2026-12-05', amount: 98000 }] } };
+    const plan = buildInstallmentPlan({ installments: pendingInstallments(debt), reserved: 25000, today, frequency: 'biweekly' });
+    expect(plan.schedule).toEqual([
+      { date: '2026-10-21', amount: 50000 },
+      { date: '2026-11-05', amount: 50000 },
+      { date: '2026-11-20', amount: 49000 },
+      { date: '2026-12-05', amount: 49000 },
+    ]);
+    expect(plan).toMatchObject({ reserved: 25000, toCover: 198000, total: 198000 });
+  });
+
+  test('mensualidad vencida: se aporta hoy', () => {
+    const plan = buildInstallmentPlan({ installments: [{ date: '2026-09-05', amount: 30000 }, { date: '2026-10-05', amount: 30000 }], today, frequency: 'weekly' });
+    expect(plan.overdue).toBe(true);
+    expect(plan.schedule[0]).toEqual({ date: today, amount: 30000 });
+  });
+
+  test('ajustar a mi comodidad avisa si no alcanza para una mensualidad aunque acabe a tiempo', () => {
+    const installments = [{ date: '2026-10-10', amount: 50000 }, { date: '2026-12-01', amount: 10000 }];
+    const plan = planFromAmount({ outstanding: 60000, today, deadline: '2026-12-01', frequency: 'weekly', amountPerPeriod: 10000, installments });
+    expect(plan.finishDate <= '2026-12-01').toBe(true);
+    expect(plan.missedInstallment).toEqual(installments[0]);
+    expect(plan.meetsDeadline).toBe(false);
   });
 });
