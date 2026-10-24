@@ -1,6 +1,6 @@
 # Guía de release (Android)
 
-Todo está preparado. La versión 0.04 está compilada y publicada en GitHub
+Todo está preparado. La versión 0.05 está compilada y publicada en GitHub
 Releases (firmada con tu clave release).
 
 ## Estado listo para release
@@ -9,12 +9,12 @@ Releases (firmada con tu clave release).
 |---|---|
 | Nombre visible | "Aurea Finance" (`android/app/src/main/res/values/strings.xml`) |
 | Paquete | `com.aureafinance` |
-| Versión | `versionCode 4`, `versionName "0.04"` (`android/app/build.gradle`) |
+| Versión | `versionCode 5`, `versionName "0.05"` (`android/app/build.gradle`) |
 | Icono | Generado: neón azul-morado. Hay versión clásica, redonda, adaptativa (Android 8+) con capa monocroma, y 512 px para la tienda (`assets/brand/playstore-512.png`) |
 | Firma release | Configurada para leer **tu** clave privada de `~/.gradle/gradle.properties`. Nunca usa la clave de depuración |
 | Permisos release | INTERNET, USE_BIOMETRIC, POST_NOTIFICATIONS, RECEIVE_BOOT_COMPLETED, WAKE_LOCK, VIBRATE |
 | Copias de seguridad de Android | Desactivadas (`allowBackup=false` + reglas de extracción) |
-| Pruebas | `npm run release:check` → 252/252 pruebas, 0 errores de lint |
+| Pruebas | `npm run release:check` → 261/261 pruebas, 0 errores de lint |
 
 ## Pasos para publicar
 

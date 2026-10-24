@@ -13,6 +13,7 @@ import { useQuery } from '../hooks/useQuery';
 import { useSettings } from '../hooks/useSettings';
 import { getPeriodSummary } from '../services/stats/summaryService';
 import { getUpcoming } from '../services/stats/upcomingService';
+import { getDailyAllowance } from '../services/stats/dailyAllowanceService';
 import { listBudgetStatus } from '../services/budgets/budgetService';
 import { frequentExpenses, duplicateTransaction } from '../services/transactions/transactionService';
 import { transactionsRepository } from '../database/repositories/transactionsRepository';
@@ -34,15 +35,16 @@ import TransactionCard from '../components/TransactionCard';
 import BudgetProgress from '../components/BudgetProgress';
 import CategoryIcon from '../components/CategoryIcon';
 
-async function loadHome(db, { periodSettings, period, remainingMode }) {
-  const [summary, upcoming, budgets, recent, frequent] = await Promise.all([
+async function loadHome(db, { periodSettings, period, remainingMode, cushion }) {
+  const [summary, upcoming, budgets, recent, frequent, daily] = await Promise.all([
     getPeriodSummary(db, { periodSettings, period, remainingMode }),
     getUpcoming(db, { days: 31 }),
     listBudgetStatus(db, periodSettings),
     transactionsRepository.search(db, {}, { limit: 5 }),
     frequentExpenses(db, 4),
+    getDailyAllowance(db, { periodSettings, cushion }),
   ]);
-  return { summary, upcoming, budgets, recent, frequent };
+  return { summary, upcoming, budgets, recent, frequent, daily };
 }
 
 export default function INICIO({ navigation }) {
@@ -61,8 +63,8 @@ export default function INICIO({ navigation }) {
   }, [periodSettings, offset]);
 
   const { data, loading, reload } = useQuery(
-    d => (period ? loadHome(d, { periodSettings, period, remainingMode: settings['circle.remainingBase'] }) : Promise.resolve(null)),
-    [period && period.start, period && period.end, settings && settings['circle.remainingBase']],
+    d => (period ? loadHome(d, { periodSettings, period, remainingMode: settings['circle.remainingBase'], cushion: settings['daily.cushion'] }) : Promise.resolve(null)),
+    [period && period.start, period && period.end, settings && settings['circle.remainingBase'], settings && settings['daily.cushion']],
   );
 
   const openTx = useCallback(id => navigation.navigate(ROUTES.MOVIMIENTO_DETALLE, { id }), [navigation]);
@@ -186,6 +188,8 @@ export default function INICIO({ navigation }) {
           </Card>
         ) : null}
 
+        {overview && overview.hasAccounts && data.daily ? <DailyCard daily={data.daily} onPress={() => navigation.navigate(ROUTES.GASTO_DIARIO)} /> : null}
+
         {data && (data.upcoming.nextPayment || data.upcoming.nextCardDue) ? (
           <View style={styles.grid}>
             {data.upcoming.nextPayment ? (
@@ -272,6 +276,34 @@ export default function INICIO({ navigation }) {
   );
 }
 
+/** "Hoy puedes gastar": lo del día, lo que llevas y cómo va (verde, amarillo, rojo). */
+function DailyCard({ daily: d, onPress }) {
+  const ratio = d.allowance > 0 ? d.spentToday / d.allowance : d.spentToday > 0 ? 1.01 : 0;
+  const tone = ratio > 1 ? colors.coral : ratio >= 0.75 ? colors.gold : colors.teal;
+  const until = d.horizonSource === 'income' ? `hasta tu ingreso del ${formatDate(d.horizon, { withYear: false })}` : 'hasta el fin del periodo';
+  let detail;
+  if (d.shortfall > 0) detail = `Te faltan ${formatMoney(d.shortfall)} para tus pagos ${until}`;
+  else if (d.leftToday < 0) detail = `Te pasaste ${formatMoney(-d.leftToday)} · mañana ${formatMoney(d.tomorrowAllowance ?? 0)}`;
+  else if (d.spentToday > 0) detail = `Llevas ${formatMoney(d.spentToday)} · te quedan ${formatMoney(d.leftToday)}`;
+  else detail = `${d.days} ${d.days === 1 ? 'día' : 'días'} ${until}`;
+  return (
+    <Card index={3} onPress={onPress} accessibilityLabel={`Hoy puedes gastar ${formatMoney(d.allowance)}. ${detail}`} style={styles.dailyCard}>
+      <View style={styles.rowBetween}>
+        <View style={styles.flexStart}>
+          <AppText variant="label" color={colors.textSecondary}>Hoy puedes gastar</AppText>
+          <MoneyText cents={d.allowance} variant="amountLg" color={d.allowance > 0 ? colors.text : colors.coral} style={styles.mt} />
+        </View>
+        <Icon name="chevron-right" size={18} color={colors.textMuted} />
+      </View>
+      <View style={styles.track}>
+        <View style={[styles.fill, { width: `${Math.min(100, Math.round(ratio * 100))}%`, backgroundColor: tone }]} />
+      </View>
+      <AppText variant="caption" color={d.shortfall > 0 || d.leftToday < 0 ? colors.coral : colors.textMuted} style={styles.mt}>{detail}</AppText>
+      {d.pendingIncome ? <AppText variant="caption" color={colors.gold}>Confirma tu ingreso del {formatDate(d.pendingIncome.date, { withYear: false })} para que cuente</AppText> : null}
+    </Card>
+  );
+}
+
 function openUpcoming(navigation, item) {
   if (item.type === 'debt_due') navigation.navigate(ROUTES.DEUDA_DETALLE, { id: item.debtId });
   else if (item.type === 'card_due') navigation.navigate(ROUTES.CUENTA_DETALLE, { id: item.accountId });
@@ -304,6 +336,10 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: 'row', alignItems: 'center' },
   flex: { flex: 1, marginHorizontal: spacing.md },
   debtBox: { alignItems: 'flex-end' },
+  dailyCard: { marginTop: spacing.md, marginBottom: spacing.md },
+  flexStart: { flex: 1 },
+  track: { height: 6, borderRadius: 3, backgroundColor: colors.ringTrack, marginTop: spacing.md, overflow: 'hidden' },
+  fill: { height: 6, borderRadius: 3 },
   cta: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md, borderColor: colors.teal },
   topCat: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
   right: { alignItems: 'flex-end' },

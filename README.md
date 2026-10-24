@@ -155,6 +155,10 @@ Resumen (detalle en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)):
 - **Próximo pago de una tarjeta:** lo no financiado más las mensualidades del
   mes, no la deuda total. Un plan sin pago mensual no se estima: se avisa que
   falta capturarlo.
+- **¿Cuánto puedo gastar hoy?:** lo libre (disponible − pagos antes del
+  próximo ingreso − colchón − gastos planeados) entre los días que faltan para
+  tu próximo ingreso. Se recalcula cada día: si un día gastas de más, los
+  días restantes bajan solos.
 - **Recurrencias:**
   - Sin duplicados (ocurrencias únicas por regla y fecha).
   - Un ingreso previsto no suma hasta que lo confirmas, salvo que actives el

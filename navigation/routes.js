@@ -25,5 +25,6 @@ export const ROUTES = {
   AJUSTES: 'Ajustes',
   IMPORTAR_CSV: 'ImportarCSV',
   ASISTENTE: 'Asistente',
+  GASTO_DIARIO: 'GastoDiario',
   BIENVENIDA: 'Bienvenida',
 };

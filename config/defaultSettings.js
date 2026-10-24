@@ -27,6 +27,8 @@ export const DEFAULT_SETTINGS = {
   'notifications.hour': 9,
   'notifications.dailyReminder': false,
   'notifications.dailyReminderHour': 21,
+  // Colchón para imprevistos que no cuenta en "¿Cuánto puedo gastar hoy?" (centavos).
+  'daily.cushion': 0,
   'ui.reduceMotion': false,
   'ai.enabled': false,
   'ai.endpoint': '',

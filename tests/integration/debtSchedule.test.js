@@ -184,7 +184,7 @@ test('actualizar desde la versión 0.01 (migración 2) conserva los datos', asyn
   );
   const before = { accounts: await old.all('SELECT * FROM accounts'), debts: await old.all('SELECT * FROM debts') };
   const applied = await migrate(old);
-  expect(applied).toEqual([3]);
+  expect(applied).toEqual([3, 4]);
   expect(before.accounts).toHaveLength(1);
   expect(await old.all('SELECT * FROM accounts')).toEqual(before.accounts);
   expect(await old.all('SELECT * FROM debts')).toEqual(before.debts);

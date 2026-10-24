@@ -1,4 +1,24 @@
-# Estado del proyecto — 24 de octubre de 2026 (versión 0.04)
+# Estado del proyecto — 24 de octubre de 2026 (versión 0.05)
+
+## Versión 0.05: "¿Cuánto puedo gastar hoy?"
+
+- **Nuevo en Inicio:** tarjeta "Hoy puedes gastar" con lo que llevas y una
+  barra (verde, amarilla, roja). Pantalla `GASTO_DIARIO` con el desglose.
+- **Cálculo** (`services/stats/dailyAllowanceService.js`): dinero disponible
+  − pagos que vencen antes del próximo ingreso (tarjetas con lo no financiado
+  + mensualidades, mensualidades fuera de tarjeta, gastos recurrentes) −
+  compras con tarjeta desde el último ingreso si esa tarjeta vence después −
+  colchón − gastos planeados, ÷ días hasta el próximo ingreso. Se recalcula
+  siempre: lo gastado de más se reparte en los días restantes. Solo usa la
+  fecha del ingreso, nunca su monto; un ingreso sin confirmar no cuenta y se
+  avisa. Sin ingreso recurrente, reparte hasta el fin del periodo. Las
+  compras a meses no cuentan (cuenta su mensualidad).
+- **Gastos planeados** (migración v4, tabla `planned_spends`, incluida en el
+  respaldo): se apartan de los días previos y se suman a su día.
+- **Colchón** configurable (`daily.cushion`, por defecto $0).
+- **Pruebas:** 261/261, 9 nuevas en `tests/integration/dailyAllowance.test.js`.
+- **No incluido (decisiones pendientes):** tope por presupuesto, restar
+  aportaciones a metas y dar más peso a fines de semana.
 
 ## Versión 0.04: recomendado = mensualidad en curso
 

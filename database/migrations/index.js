@@ -36,10 +36,24 @@ const SCHEMA_V3 = [
   'CREATE INDEX idx_schedule_debt ON debt_schedule_items(debt_id, due_date)',
 ];
 
+const SCHEMA_V4 = [
+  // Gastos planeados (p. ej. una salida el sábado): se apartan del gasto diario
+  // de los días previos y se suman al día en que ocurren.
+  `CREATE TABLE planned_spends (
+    id TEXT PRIMARY KEY,
+    planned_date TEXT NOT NULL,
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    note TEXT,
+    created_at TEXT NOT NULL
+  )`,
+  'CREATE INDEX idx_planned_date ON planned_spends(planned_date)',
+];
+
 export const MIGRATIONS = [
   { version: 1, name: 'esquema_inicial', statements: SCHEMA_V1 },
   { version: 2, name: 'integridad_deuda_moneda', statements: SCHEMA_V2 },
   { version: 3, name: 'calendario_pagos_deuda', statements: SCHEMA_V3 },
+  { version: 4, name: 'gastos_planeados', statements: SCHEMA_V4 },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

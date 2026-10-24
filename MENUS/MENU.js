@@ -33,6 +33,7 @@ import PRESUPUESTOS from './PRESUPUESTOS';
 import PRESUPUESTO_FORM from './PRESUPUESTO_FORM';
 import DEUDA_FORM from './DEUDA_FORM';
 import DEUDA_DETALLE from './DEUDA_DETALLE';
+import GASTO_DIARIO from './GASTO_DIARIO';
 import METAS from './METAS';
 import META_FORM from './META_FORM';
 import META_DETALLE from './META_DETALLE';
@@ -110,6 +111,7 @@ export default function MENU() {
         <Stack.Screen name={ROUTES.AJUSTES} component={AJUSTES} options={{ title: 'Ajustes' }} />
         <Stack.Screen name={ROUTES.IMPORTAR_CSV} component={IMPORTAR_CSV} options={{ title: 'Importar CSV' }} />
         <Stack.Screen name={ROUTES.ASISTENTE} component={ASISTENTE} options={{ title: 'Asistente' }} />
+        <Stack.Screen name={ROUTES.GASTO_DIARIO} component={GASTO_DIARIO} options={{ title: 'Gasto de hoy' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
