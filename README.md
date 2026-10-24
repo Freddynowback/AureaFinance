@@ -132,7 +132,9 @@ Resumen (detalle en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)):
 - **Deudas:**
   - Se actualizan a mano con conciliaciones (historial), nunca con gastos.
   - El recomendador de pagos calcula planes semanal, quincenal o mensual con
-    importes exactos.
+    importes exactos. Con pago mensual o calendario reparte cada mensualidad
+    antes de su fecha ($400 al mes = $200 por quincena = $100 por semana);
+    también puede repartir todo el saldo hasta una fecha ("Liquidar antes").
   - Nunca crea pagos por sí mismo.
 - **Restante del círculo** (presupuesto, ingresos o ingresos previstos) separado
   de los saldos:

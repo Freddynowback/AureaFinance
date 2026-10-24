@@ -1,4 +1,22 @@
-# Estado del proyecto — 24 de octubre de 2026 (versión 0.02)
+# Estado del proyecto — 24 de octubre de 2026 (versión 0.03)
+
+## Versión 0.03: recomendador por mensualidades
+
+- **Corregido: el recomendador pedía liquidar todo el saldo** antes del
+  próximo vencimiento (tomaba esa fecha como límite y repartía ahí el saldo
+  completo). Ahora, si la financiación tiene pago mensual fijo o calendario,
+  el objetivo por defecto es "Mensualidades": cada mensualidad se reparte
+  antes de su fecha ($400 al mes = 2 × $200 por quincena = 4 × $100 por
+  semana). Si para la primera queda menos tiempo, sus aportaciones son menos
+  y más altas, y se indica. Lo apartado cubre primero la mensualidad más
+  próxima. "Liquidar antes" conserva el reparto por fecha límite, que ahora
+  parte de la última mensualidad.
+- "Ajustar a mi comodidad" avisa si la cantidad no alcanza para alguna
+  mensualidad en su fecha.
+- **Probado en el emulador:** Laptop $2,400 a $400/mes con vencimiento el
+  24 nov → Semanal $100 (24 periodos), Quincenal $200 (12), Mensual $400 (6).
+  Liquidar antes (24 abr 2027) → $93 por semana.
+- **Pruebas:** 251/251, 6 nuevas en `tests/unit/recommender.test.js`.
 
 ## Versión 0.02: calendario de pagos y próximo pago correcto
 
