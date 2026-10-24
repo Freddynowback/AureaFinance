@@ -1,4 +1,56 @@
-# Estado del proyecto — 17 de octubre de 2026 (iteración 3)
+# Estado del proyecto — 24 de octubre de 2026 (versión 0.02)
+
+## Versión 0.02: calendario de pagos y próximo pago correcto
+
+- **Corregido: el widget "Próximo pago" mostraba la deuda total de la tarjeta.**
+  Ahora muestra lo que toca pagar: lo no financiado más las mensualidades del
+  mes (pago fijo o mes del calendario). Lo mismo en "Vence tarjeta", la
+  notificación de la tarjeta y "Pagos próximos" en Estadísticas. Un plan sin
+  pago mensual no se estima: se avisa que falta capturarlo.
+- **Nuevo: calendario de pagos personalizado.** Una financiación puede pagarse
+  con un calendario: cada mes que muestra el banco, capturado a mano con su
+  monto. El saldo pendiente es la suma de los meses; los pagos vinculados
+  cubren primero el mes más antiguo (también en parte). Pensado para
+  compras a meses revueltas de las que solo se conoce el total de cada mes.
+- **Migración v3:** tabla `debt_schedule_items` (incluida en el respaldo). No
+  modifica datos existentes; probado actualizando una base de la v0.01.
+- **Probado en el emulador (Android 17, APK release firmado):**
+  - Actualización real: v0.01 instalada con datos (débito $20,000, NU con
+    $5,000 de deuda, plan Audífonos $600 a $100/mes ya incluido) y v0.02
+    instalada encima. Los datos se conservaron.
+  - Antes (v0.01): "Próximo pago" $5,000 "deuda total de la tarjeta".
+    Después (v0.02): $4,500 = $4,400 sin financiar + $100 de mensualidades.
+  - Plan con calendario (2 meses: $1,250 y $980, ya incluido): la deuda de la
+    tarjeta no cambió; Inicio mostró el mes del calendario ($1,250) y la
+    tarjeta $3,520 = $2,170 + $1,350. Tras registrar el pago propuesto
+    ($1,250), el mes quedó "Pagado", el siguiente pasó a "Este mes" y la
+    tarjeta bajó a $3,250. La edición carga solo los meses que faltan; la
+    validación impide guardar meses sin importe.
+- **Pruebas:** 245/245 (28 suites), 12 nuevas en
+  `tests/integration/debtSchedule.test.js`. Se corrigió una prueba que
+  dependía de la fecha (`notificationService`).
+
+## Pendiente agendado (pedido por el usuario, no implementado aún)
+
+**Vincular obligatoriamente los pagos de tarjeta con financiaciones.** Hoy
+"Pagar tarjeta" tiene un selector *opcional* de financiación; si no se elige,
+baja la deuda de la tarjeta pero no el saldo del plan, y lo no financiado sale
+de menos. Diseño acordado:
+
+1. Pregunta obligatoria "¿A qué va este pago?": solo tarjeta / a una
+   financiación (elegir cuál) / mixto.
+2. Con financiación o mixto, proponer el monto del mes que el usuario capturó
+   (editable).
+3. Si se paga más que eso, separar automáticamente en dos movimientos: la
+   parte del plan (vinculada) y el resto a la tarjeta.
+4. Si la tarjeta no tiene financiaciones activas, no preguntar.
+
+También pendiente: separar por fecha de corte lo que toca pagar este mes (hoy
+lo no financiado incluye compras posteriores al corte).
+
+---
+
+# Iteración 3 — 17 de octubre de 2026
 
 ## Iteración 3: coherencia multi-tarjeta, icono y release listo
 

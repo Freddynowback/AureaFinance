@@ -4,7 +4,7 @@
  */
 import { accountsRepository } from '../../database/repositories/accountsRepository';
 import { reservationsRepository } from '../../database/repositories/reservationsRepository';
-import { debtsRepository } from '../../database/repositories/debtsRepository';
+import { loadDebtsWithPayments } from '../debts/schedule';
 import { creditSummary, creditTotals } from './creditService';
 import { CURRENCIES, DEFAULT_CURRENCY } from '../../config/currencies';
 import { addDays, isISODate, nextMonthlyDate, nowDateTime, stamp, todayISO } from '../../utils/dates';
@@ -157,7 +157,7 @@ export async function getAccountsOverview(db, today = todayISO()) {
   const [accounts, reserved, debts] = await Promise.all([
     accountsRepository.list(db),
     reservationsRepository.totalAgainstLiquid(db),
-    debtsRepository.list(db),
+    loadDebtsWithPayments(db, undefined, today),
   ]);
   let liquid = 0;
   let debt = 0;

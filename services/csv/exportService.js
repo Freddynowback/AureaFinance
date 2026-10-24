@@ -65,7 +65,7 @@ export async function exportTransactionsCSV(db, filters = {}) {
 
 const BACKUP_TABLES = [
   'accounts', 'categories', 'debts', 'transactions', 'debt_balance_snapshots', 'goals', 'reservations',
-  'budgets', 'recurring_rules', 'recurring_occurrences', 'import_batches', 'settings',
+  'budgets', 'recurring_rules', 'recurring_occurrences', 'import_batches', 'settings', 'debt_schedule_items',
 ];
 
 /** Respaldo completo (archivo distinto de la exportación de movimientos). */

@@ -11,16 +11,26 @@ export async function getUpcoming(db, { days = 31, today = todayISO() } = {}) {
   const to = addDays(today, days);
   const [overview, debts, occurrences] = await Promise.all([
     getAccountsOverview(db, today),
-    listDebts(db),
+    listDebts(db, undefined, today),
     upcoming(db, { from: addDays(today, -7), to }),
   ]);
   const items = [];
   for (const a of overview.accounts) {
     // Solo hay pago que avisar si la tarjeta tiene deuda.
     if (a.type === 'credit' && a.nextDue && a.nextDue <= to && a.debt > 0) {
+      // Lo que toca pagar: lo no financiado + las mensualidades del mes, no la
+      // deuda total (que incluye el saldo completo de cada financiación).
+      const c = a.credit;
       items.push({
-        type: 'card_due', date: a.nextDue, title: `Vence ${a.name}`, amount: a.debt || 0,
-        amountIsEstimate: true, accountId: a.id,
+        type: 'card_due', date: a.nextDue, title: `Vence ${a.name}`, amount: c.dueNow,
+        amountIsEstimate: c.plansWithoutMonthly > 0, accountId: a.id,
+        breakdown: {
+          revolving: c.revolving,
+          monthlyDue: c.monthlyDue,
+          plansCount: c.plansCount,
+          plansWithoutMonthly: c.plansWithoutMonthly,
+          totalDebt: a.debt,
+        },
       });
     }
   }
@@ -28,8 +38,8 @@ export async function getUpcoming(db, { days = 31, today = todayISO() } = {}) {
     if (d.effectiveDueDate && d.effectiveDueDate <= to && d.outstanding > 0) {
       items.push({
         type: 'debt_due', date: d.effectiveDueDate, title: d.name,
-        amount: d.monthly_payment ? Math.min(d.monthly_payment, d.outstanding) : d.outstanding,
-        amountIsEstimate: !d.monthly_payment, debtId: d.id,
+        amount: d.monthlyDue !== null ? d.monthlyDue : d.outstanding,
+        amountIsEstimate: d.monthlyDue === null, debtId: d.id,
       });
     }
   }

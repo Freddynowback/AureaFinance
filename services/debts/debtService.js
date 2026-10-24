@@ -4,14 +4,18 @@
  *  - Actualizar saldo: conciliación (snapshot), no crea gastos.
  *  - Registrar pago: movimiento card_payment hacia la tarjeta de la deuda.
  *  - Apartar dinero: reserva virtual; no mueve dinero ni reduce la deuda.
+ *  - Calendario de pagos: meses capturados a mano; su suma es el saldo pendiente.
  */
 import { accountsRepository } from '../../database/repositories/accountsRepository';
 import { debtsRepository } from '../../database/repositories/debtsRepository';
 import { reservationsRepository } from '../../database/repositories/reservationsRepository';
-import { addMonths, isISODate, nowDateTime, stamp, todayISO } from '../../utils/dates';
+import { isISODate, nowDateTime, stamp, todayISO } from '../../utils/dates';
 import { check, throwIfErrors, ValidationError } from '../../utils/errors';
 import { uuid } from '../../utils/id';
 import { insertTransaction } from '../transactions/transactionService';
+import { effectiveDueDate, loadDebtsWithPayments, withPayments } from './schedule';
+
+export { effectiveDueDate };
 
 export const FINANCING_LABELS = {
   msi: 'Meses sin intereses',
@@ -23,6 +27,26 @@ export const FINANCING_LABELS = {
 
 const clean = v => (typeof v === 'string' ? v.trim() || null : v ?? null);
 const optInt = v => (v === '' || v === undefined || v === null ? null : Number(v));
+
+/** Valida los meses capturados: fecha válida y única, importe entero positivo. */
+function normalizeSchedule(schedule, f) {
+  const seen = new Set();
+  const items = [];
+  schedule.forEach((it, i) => {
+    const okDate = isISODate(it.due_date);
+    const okAmount = Number.isSafeInteger(it.amount) && it.amount > 0;
+    if (!okDate) f[`schedule.${i}.due_date`] = 'Fecha no válida';
+    else if (seen.has(it.due_date)) f[`schedule.${i}.due_date`] = 'Fecha repetida';
+    if (!okAmount) f[`schedule.${i}.amount`] = 'Escribe el importe';
+    if (okDate) seen.add(it.due_date);
+    items.push({ due_date: it.due_date, amount: it.amount });
+  });
+  check(f, items.length > 0, 'schedule', 'Agrega al menos un mes');
+  if (Object.keys(f).some(k => k.startsWith('schedule.'))) f.schedule = f.schedule || 'Revisa los meses del calendario';
+  return items.sort((a, b) => (a.due_date < b.due_date ? -1 : 1));
+}
+
+const scheduleRows = items => items.map(it => ({ id: uuid(), due_date: it.due_date, amount: it.amount, created_at: stamp() }));
 
 async function normalize(db, input) {
   const f = {};
@@ -40,24 +64,28 @@ async function normalize(db, input) {
   if (installments !== null) check(f, Number.isInteger(installments) && installments >= 0, 'installments_remaining', 'Número no válido');
   const rate = optInt(input.interest_rate_bp);
   if (rate !== null) check(f, Number.isInteger(rate) && rate >= 0, 'interest_rate_bp', 'Tasa no válida');
+  // Con calendario, el pago fijo, el vencimiento y las cuotas salen de los meses capturados.
+  const schedule = Array.isArray(input.schedule) ? normalizeSchedule(input.schedule, f) : null;
   throwIfErrors(f);
   return {
     name,
     account_id: account.id,
     financing_type: input.financing_type || 'other',
-    monthly_payment: monthly,
-    next_due_date: input.next_due_date || null,
+    monthly_payment: schedule ? null : monthly,
+    next_due_date: schedule ? schedule[0].due_date : input.next_due_date || null,
     statement_day: statementDay,
-    installments_remaining: installments,
+    installments_remaining: schedule ? null : installments,
     interest_rate_bp: rate,
     notes: clean(input.notes),
     currency: account.currency,
+    schedule,
   };
 }
 
 export async function insertDebt(tx, input) {
-  const data = await normalize(tx, input);
-  const balance = input.balance;
+  const { schedule, ...data } = await normalize(tx, input);
+  // Con calendario, el saldo pendiente es la suma de los meses capturados.
+  const balance = schedule ? schedule.reduce((s, it) => s + it.amount, 0) : input.balance;
   if (!Number.isSafeInteger(balance) || balance < 0) {
     throw new ValidationError({ balance: 'Introduce el saldo pendiente' });
   }
@@ -71,6 +99,7 @@ export async function insertDebt(tx, input) {
     updated_at: now,
   };
   await debtsRepository.insert(tx, debt);
+  if (schedule) await debtsRepository.replaceSchedule(tx, debt.id, scheduleRows(schedule));
   await debtsRepository.insertSnapshot(tx, {
     id: uuid(),
     debt_id: debt.id,
@@ -115,13 +144,39 @@ export function createFinancedPurchase(db, expenseInput, debtInput) {
   });
 }
 
-export async function updateDebt(db, id, input) {
-  const previous = await debtsRepository.get(db, id);
-  if (!previous) throw new ValidationError({ id: 'La deuda no existe' });
-  const data = await normalize(db, { ...previous, ...input });
-  const status = input.status || previous.status;
-  await debtsRepository.update(db, { ...previous, ...data, status, id, updated_at: stamp() });
-  return debtsRepository.get(db, id);
+/**
+ * Editar una deuda. Si trae `schedule`, son los meses que FALTAN según el
+ * banco: reemplazan el calendario y, si su suma cambia el saldo pendiente, se
+ * concilia a esa suma (con historial, no es un gasto).
+ */
+export function updateDebt(db, id, input) {
+  return db.transaction(async tx => {
+    const previous = await debtsRepository.get(tx, id);
+    if (!previous) throw new ValidationError({ id: 'La deuda no existe' });
+    const hadSchedule = (await debtsRepository.scheduleItems(tx, id)).length > 0;
+    const { schedule, ...data } = await normalize(tx, { ...previous, ...input });
+    const status = input.status || previous.status;
+    await debtsRepository.update(tx, { ...previous, ...data, status, id, updated_at: stamp() });
+    if (schedule) {
+      await debtsRepository.replaceSchedule(tx, id, scheduleRows(schedule));
+      const total = schedule.reduce((s, it) => s + it.amount, 0);
+      if (total !== previous.outstanding) {
+        await debtsRepository.insertSnapshot(tx, {
+          id: uuid(),
+          debt_id: id,
+          balance: total,
+          recorded_at: nowDateTime(),
+          kind: 'reconciliation',
+          note: 'Calendario de pagos actualizado',
+          created_at: stamp(),
+        });
+      }
+    } else if (hadSchedule && input.schedule === null) {
+      // Cambio a pago mensual fijo: el saldo pendiente se conserva.
+      await debtsRepository.replaceSchedule(tx, id, []);
+    }
+    return debtsRepository.get(tx, id);
+  });
 }
 
 /** Actualización manual mensual del saldo pendiente: conciliación, nunca un gasto. */
@@ -207,22 +262,15 @@ export function reserveForDebt(db, debtId, amount, { accountId = null, note } = 
 }
 
 /** Siguiente vencimiento efectivo: si la fecha guardada ya pasó, avanza mes a mes. */
-export function effectiveDueDate(debt, today = todayISO()) {
-  if (!debt.next_due_date) return null;
-  let d = debt.next_due_date;
-  const day = Number(debt.next_due_date.slice(8, 10));
-  for (let i = 0; d < today && i < 240; i++) d = addMonths(debt.next_due_date, i + 1, day);
-  return d;
-}
-
 /** Historial para la gráfica: saldos conciliados y pagos en orden cronológico. */
 export async function getDebtDetail(db, id) {
   const debt = await debtsRepository.get(db, id);
   if (!debt) return null;
-  const [snapshots, payments, reservations] = await Promise.all([
+  const [snapshots, payments, reservations, items] = await Promise.all([
     debtsRepository.snapshots(db, id),
     debtsRepository.payments(db, id),
     reservationsRepository.list(db, 'debt', id),
+    debtsRepository.scheduleItems(db, id),
   ]);
   const events = [
     ...snapshots.map(s => ({ type: 'snapshot', at: s.created_at, date: s.recorded_at, amount: s.balance, note: s.note, id: s.id })),
@@ -233,7 +281,7 @@ export async function getDebtDetail(db, id) {
     running = e.type === 'snapshot' ? e.amount : running - e.amount;
     return { ...e, balanceAfter: running };
   });
-  return { debt: { ...debt, effectiveDueDate: effectiveDueDate(debt) }, snapshots, payments, reservations, history };
+  return { debt: withPayments([debt], items)[0], snapshots, payments, reservations, history };
 }
 
 export async function deleteDebt(db, id) {
@@ -243,6 +291,6 @@ export async function deleteDebt(db, id) {
   });
 }
 
-export function listDebts(db, opts) {
-  return debtsRepository.list(db, opts).then(list => list.map(d => ({ ...d, effectiveDueDate: effectiveDueDate(d) })));
+export function listDebts(db, opts, today = todayISO()) {
+  return loadDebtsWithPayments(db, opts, today);
 }

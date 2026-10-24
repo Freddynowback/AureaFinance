@@ -32,12 +32,20 @@ export async function buildDebtContext(db, debtId, { today = todayISO(), deadlin
     getAccountsOverview(db, today),
     projectedRecurring(db, 'income', today, horizon),
     projectedRecurring(db, 'expense', today, horizon),
-    listDebts(db),
+    listDebts(db, undefined, today),
     averageDailySpending(db, 56, today),
   ]);
   const obligations = [];
   for (const d of debts) {
-    if (d.id === debtId || !d.monthly_payment || !d.effectiveDueDate || d.outstanding <= 0) continue;
+    if (d.id === debtId || d.outstanding <= 0) continue;
+    if (d.schedule) {
+      // Calendario capturado: cada mes que falta con su importe real.
+      for (const it of d.schedule.pending) {
+        if (it.due_date <= horizon) obligations.push({ date: it.due_date, amount: it.amount, name: d.name });
+      }
+      continue;
+    }
+    if (!d.monthly_payment || !d.effectiveDueDate) continue;
     let left = d.outstanding;
     for (let date = d.effectiveDueDate, i = 0; date <= horizon && left > 0 && i < 60; i++, date = addMonths(d.effectiveDueDate, i + 1)) {
       const amount = Math.min(d.monthly_payment, left);

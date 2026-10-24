@@ -85,6 +85,24 @@ export const debtsRepository = {
     );
   },
 
+  scheduleItems(db, debtId) {
+    return db.all('SELECT * FROM debt_schedule_items WHERE debt_id = ? ORDER BY due_date', [debtId]);
+  },
+
+  allScheduleItems(db) {
+    return db.all('SELECT * FROM debt_schedule_items ORDER BY debt_id, due_date');
+  },
+
+  async replaceSchedule(db, debtId, items) {
+    await db.run('DELETE FROM debt_schedule_items WHERE debt_id = ?', [debtId]);
+    for (const it of items) {
+      await db.run(
+        'INSERT INTO debt_schedule_items (id, debt_id, due_date, amount, created_at) VALUES (?, ?, ?, ?, ?)',
+        [it.id, debtId, it.due_date, it.amount, it.created_at],
+      );
+    }
+  },
+
   payments(db, debtId) {
     return db.all(
       `SELECT t.*, a.name AS account_name FROM transactions t LEFT JOIN accounts a ON a.id = t.account_id

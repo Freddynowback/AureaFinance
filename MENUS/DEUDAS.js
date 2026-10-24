@@ -92,7 +92,9 @@ export default function DEUDAS({ navigation }) {
               </View>
               <View style={styles.right}>
                 <AppText variant="subtitle" color={outstanding ? colors.coral : colors.teal}>{outstanding ? formatMoney(outstanding) : 'Liquidada'}</AppText>
-                {d.monthly_payment ? <AppText variant="caption" color={colors.textSecondary}>{formatMoney(d.monthly_payment)} / mes</AppText> : null}
+                {d.schedule && d.monthlyDue !== null ? (
+                  <AppText variant="caption" color={colors.textSecondary}>{formatMoney(d.monthlyDue)} este mes · {d.installmentsLeft} {d.installmentsLeft === 1 ? 'mes' : 'meses'}</AppText>
+                ) : d.monthly_payment ? <AppText variant="caption" color={colors.textSecondary}>{formatMoney(d.monthly_payment)} / mes</AppText> : null}
               </View>
             </View>
             {outstanding ? (

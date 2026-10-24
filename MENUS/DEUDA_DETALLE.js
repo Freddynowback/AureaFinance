@@ -35,7 +35,7 @@ async function load(db, id) {
   const detail = await getDebtDetail(db, id);
   if (!detail) return null;
   const [context, accounts] = await Promise.all([
-    buildDebtContext(db, id, { deadline: detail.debt.effectiveDueDate }),
+    buildDebtContext(db, id, { deadline: detail.debt.schedule && detail.debt.schedule.pending.length ? detail.debt.schedule.pending[detail.debt.schedule.pending.length - 1].due_date : detail.debt.effectiveDueDate }),
     accountsRepository.list(db),
   ]);
   return { ...detail, context, payFrom: accounts.filter(a => a.type !== 'credit') };
@@ -85,7 +85,8 @@ export default function DEUDA_DETALLE({ navigation, route }) {
     <Screen>
       <AppText variant="caption" color={colors.textSecondary}>
         {FINANCING_LABELS[debt.financing_type]} · {debt.account_name || 'Sin tarjeta'}
-        {debt.installments_remaining !== null && debt.installments_remaining !== undefined ? ` · ${debt.installments_remaining} cuotas restantes` : ''}
+        {debt.schedule ? ' · calendario de pagos' : ''}
+        {debt.installmentsLeft !== null && debt.installmentsLeft !== undefined ? ` · ${debt.installmentsLeft} ${debt.schedule ? (debt.installmentsLeft === 1 ? 'mes restante' : 'meses restantes') : 'cuotas restantes'}` : ''}
         {debt.interest_rate_bp !== null && debt.interest_rate_bp !== undefined ? ` · tasa ${debt.interest_rate_bp / 100}% anual` : ''}
       </AppText>
 
@@ -95,9 +96,11 @@ export default function DEUDA_DETALLE({ navigation, route }) {
           today={todayISO()}
           context={data.context}
           onReserve={perPeriod => open('reserve', perPeriod)}
-          onRegisterPayment={() => open('pay', debt.monthly_payment ? Math.min(debt.monthly_payment, outstanding) : outstanding)}
+          onRegisterPayment={() => open('pay', debt.monthlyDue !== null ? debt.monthlyDue : outstanding)}
         />
       </View>
+
+      {debt.schedule ? <ScheduleCard debt={debt} /> : null}
 
       <View style={styles.row}>
         <Button title="Actualizar saldo" icon="edit" variant="secondary" small style={styles.flex} onPress={() => open('reconcile', outstanding)} />
@@ -209,6 +212,42 @@ export default function DEUDA_DETALLE({ navigation, route }) {
         }}
       />
     </Screen>
+  );
+}
+
+/** Meses capturados: pagados, el del mes (puede ir en parte) y los que faltan. */
+function ScheduleCard({ debt }) {
+  const { items, pending, paidCount, excess } = debt.schedule;
+  const pendingByDate = Object.fromEntries(pending.map(p => [p.due_date, p]));
+  const today = todayISO();
+  return (
+    <>
+      <SectionHeader title="Calendario de pagos" />
+      <Card>
+        {items.map((it, i) => {
+          const p = pendingByDate[it.due_date];
+          const paid = i < paidCount;
+          const partial = p && p.amount < p.full;
+          const overdue = !paid && it.due_date < today;
+          const status = paid ? 'Pagado' : partial ? `Falta ${formatMoney(p.amount)}` : overdue ? 'Vencido' : i === paidCount ? 'Este mes' : 'Pendiente';
+          return (
+            <ListRow
+              key={it.id}
+              icon={paid ? 'check' : 'calendar'}
+              iconColor={paid ? colors.teal : overdue ? colors.coral : colors.gold}
+              title={formatDate(it.due_date)}
+              subtitle={status}
+              right={formatMoney(it.amount)}
+              last={i === items.length - 1}
+            />
+          );
+        })}
+      </Card>
+      <AppText variant="caption" color={colors.textMuted} style={styles.mt}>
+        Los meses los capturaste tú desde tu banco. Cada pago registrado en esta financiación cubre primero el mes más antiguo. Si tu banco cambia los montos, edítalos en "Editar".
+        {excess > 0 ? ` El saldo pendiente supera la suma del calendario por ${formatMoney(excess)}: revisa los meses.` : ''}
+      </AppText>
+    </>
   );
 }
 

@@ -2,6 +2,7 @@ import { openTestDb, categoryId, makeAccount } from '../helpers/testDb';
 import { setSettings } from '../../services/settings/settingsService';
 import { createBudget } from '../../services/budgets/budgetService';
 import { createTransaction } from '../../services/transactions/transactionService';
+import { todayISO } from '../../utils/dates';
 import {
   checkImmediateAlerts,
   refreshScheduledNotifications,
@@ -58,7 +59,8 @@ describe('notificationService integration', () => {
       account_id: account.id,
       category_id: category,
       payment_method: 'debit',
-      occurred_at: '2026-10-17 12:00:00',
+      // Hoy: el presupuesto semanal se evalúa sobre el periodo actual.
+      occurred_at: `${todayISO()} 00:00:01`,
     });
 
     const first = await checkImmediateAlerts(db);

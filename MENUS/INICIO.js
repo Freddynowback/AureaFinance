@@ -193,7 +193,9 @@ export default function INICIO({ navigation }) {
                 <AppText variant="label" color={colors.textSecondary}>Próximo pago</AppText>
                 <AppText variant="small" numberOfLines={1} style={styles.mt}>{data.upcoming.nextPayment.title}</AppText>
                 <AppText variant="subtitle">{formatMoney(data.upcoming.nextPayment.amount)}</AppText>
-                {data.upcoming.nextPayment.amountIsEstimate ? <AppText variant="caption" color={colors.textMuted}>{data.upcoming.nextPayment.type === 'card_due' ? 'deuda total de la tarjeta' : 'saldo pendiente (sin pago mensual registrado)'}</AppText> : null}
+                {data.upcoming.nextPayment.type === 'card_due' ? (
+                  cardDueCaption(data.upcoming.nextPayment) ? <AppText variant="caption" color={colors.textMuted} numberOfLines={3}>{cardDueCaption(data.upcoming.nextPayment)}</AppText> : null
+                ) : data.upcoming.nextPayment.amountIsEstimate ? <AppText variant="caption" color={colors.textMuted}>saldo pendiente (sin pago mensual registrado)</AppText> : null}
                 <AppText variant="caption" color={colors.gold}>{relativeDays(data.upcoming.nextPayment.date, todayISO())} · {formatDate(data.upcoming.nextPayment.date, { withYear: false })}</AppText>
               </Card>
             ) : null}
@@ -202,6 +204,7 @@ export default function INICIO({ navigation }) {
                 <AppText variant="label" color={colors.textSecondary}>Vence tarjeta</AppText>
                 <AppText variant="small" numberOfLines={1} style={styles.mt}>{data.upcoming.nextCardDue.title.replace(/^Vence /, '')}</AppText>
                 <AppText variant="subtitle">{formatMoney(data.upcoming.nextCardDue.amount)}</AppText>
+                {cardDueCaption(data.upcoming.nextCardDue) ? <AppText variant="caption" color={colors.textMuted} numberOfLines={3}>{cardDueCaption(data.upcoming.nextCardDue)}</AppText> : null}
                 <AppText variant="caption" color={colors.gold}>{relativeDays(data.upcoming.nextCardDue.date, todayISO())}</AppText>
               </Card>
             ) : null}
@@ -273,6 +276,15 @@ function openUpcoming(navigation, item) {
   if (item.type === 'debt_due') navigation.navigate(ROUTES.DEUDA_DETALLE, { id: item.debtId });
   else if (item.type === 'card_due') navigation.navigate(ROUTES.CUENTA_DETALLE, { id: item.accountId });
   else navigation.navigate(ROUTES.INGRESOS);
+}
+
+/** Desglose del pago de una tarjeta con financiaciones; sin ellas el importe ya es su deuda. */
+function cardDueCaption(item) {
+  const b = item.breakdown;
+  if (!b || !b.plansCount) return null;
+  const text = `${formatMoney(b.revolving)} sin financiar + ${formatMoney(b.monthlyDue)} de mensualidades`;
+  if (!b.plansWithoutMonthly) return text;
+  return `${text} · falta el pago mensual de ${b.plansWithoutMonthly} ${b.plansWithoutMonthly === 1 ? 'plan' : 'planes'}`;
 }
 
 const styles = StyleSheet.create({

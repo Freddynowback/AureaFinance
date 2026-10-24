@@ -171,7 +171,7 @@ export default function ESTADISTICAS({ navigation }) {
           <SectionHeader title="Pagos próximos (31 días)" />
           <Card style={styles.list}>
             {data.upcoming.map((u, i) => (
-              <ListRow key={`${u.type}-${u.date}-${i}`} icon={u.type === 'card_due' ? 'card' : u.type === 'debt_due' ? 'receipt' : 'repeat'} iconColor={colors.gold} title={u.title} subtitle={formatDate(u.date, { withWeekday: true })} right={formatMoney(u.amount)} last={i === data.upcoming.length - 1} />
+              <ListRow key={`${u.type}-${u.date}-${i}`} icon={u.type === 'card_due' ? 'card' : u.type === 'debt_due' ? 'receipt' : 'repeat'} iconColor={colors.gold} title={u.title} subtitle={`${formatDate(u.date, { withWeekday: true })}${u.breakdown && u.breakdown.plansCount ? ` · incluye ${formatMoney(u.breakdown.monthlyDue)} de mensualidades` : ''}`} right={formatMoney(u.amount)} last={i === data.upcoming.length - 1} />
             ))}
           </Card>
         </>

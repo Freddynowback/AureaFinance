@@ -1,3 +1,5 @@
+import { monthlyDueOf } from '../debts/schedule';
+
 /**
  * Resumen real del crédito de una tarjeta o cuenta de crédito.
  *
@@ -8,8 +10,13 @@
  *  - available: limit − used + saldo a favor (negativo = por encima del límite).
  *  - financed:  parte de lo usado que está en planes de financiación activos
  *               (saldo pendiente de cada plan, no solo el pago del mes).
- *  - monthlyDue: suma de lo que toca pagar este mes de esos planes.
+ *  - monthlyDue: suma de lo que toca pagar este mes de esos planes (pago fijo
+ *               o el mes del calendario que capturaste; nunca estimado).
  *  - revolving: lo usado que no está financiado.
+ *  - dueNow:    lo que toca pagar de la tarjeta: lo no financiado + las
+ *               mensualidades del mes (no la deuda total).
+ *  - plansWithoutMonthly: planes sin pago fijo ni calendario; su parte del
+ *               mes no se conoce y no se incluye en dueNow.
  *
  * Si las financiaciones suman más que la deuda de la tarjeta, alguna no está
  * incluida en la deuda registrada: se marca `unreconciled` para avisar.
@@ -21,8 +28,9 @@ export function creditSummary(account, debts = []) {
   const limit = account.credit_limit || null;
   const plans = debts.filter(d => d.account_id === account.id && d.status === 'active' && d.outstanding > 0);
   const financed = plans.reduce((s, d) => s + d.outstanding, 0);
-  const monthlyDue = plans.reduce((s, d) => s + (d.monthly_payment ? Math.min(d.monthly_payment, d.outstanding) : 0), 0);
-  const plansWithoutMonthly = plans.filter(d => !d.monthly_payment).length;
+  const monthlyDue = plans.reduce((s, d) => s + (monthlyDueOf(d) || 0), 0);
+  const plansWithoutMonthly = plans.filter(d => monthlyDueOf(d) === null).length;
+  const revolving = Math.max(0, used - financed);
   // Un saldo a favor (pagaste de más) también suma al disponible, como en el banco.
   const available = limit !== null ? limit - used + inFavor : null;
   return {
@@ -37,7 +45,8 @@ export function creditSummary(account, debts = []) {
     monthlyDue,
     plansCount: plans.length,
     plansWithoutMonthly,
-    revolving: Math.max(0, used - financed),
+    revolving,
+    dueNow: revolving + monthlyDue,
     unreconciled: financed > used ? financed - used : 0,
   };
 }

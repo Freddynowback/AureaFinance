@@ -37,6 +37,7 @@ describe('buildBackup integration', () => {
     const expectedTables = [
       'accounts', 'categories', 'debts', 'transactions', 'debt_balance_snapshots', 'goals',
       'reservations', 'budgets', 'recurring_rules', 'recurring_occurrences', 'import_batches', 'settings',
+      'debt_schedule_items',
     ];
     expect(Object.keys(backup.data).sort()).toEqual(expectedTables.sort());
     expect(backup.data.accounts).toEqual(expect.arrayContaining([

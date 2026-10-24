@@ -16,6 +16,12 @@ function atHour(dateISO, hour) {
   return new Date(y, m - 1, d, hour, 0, 0).getTime();
 }
 
+/** Planes de la tarjeta sin pago mensual: su parte del mes no está incluida. */
+function cardMissingText(item) {
+  const n = item.breakdown ? item.breakdown.plansWithoutMonthly : 0;
+  return n ? `. Sin incluir ${n} ${n === 1 ? 'financiación' : 'financiaciones'} sin pago mensual registrado` : '';
+}
+
 /**
  * Notificaciones programadas a futuro.
  * upcoming: resultado de getUpcoming().items
@@ -48,7 +54,7 @@ export function planScheduled({ settings, upcoming = [], now = new Date() }) {
     switch (item.type) {
       case 'card_due':
         title = `Pago de tarjeta: ${item.title.replace(/^Vence /, '')}`;
-        body = `Vence el ${dateText}. Deuda registrada: ${amount}.`;
+        body = `Vence el ${dateText}. A pagar: ${formatMoney(item.amount || 0)} (sin financiar + mensualidades del mes)${cardMissingText(item)}.`;
         break;
       case 'debt_due':
         title = `Pago próximo: ${item.title}`;

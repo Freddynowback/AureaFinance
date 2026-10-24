@@ -146,6 +146,13 @@ Resumen (detalle en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)):
   los calcula ni estima intereses. Al registrar una financiación existente se
   indica si ya está incluida en la deuda de la tarjeta; si no, se suma como
   ajuste (no como gasto).
+- **Calendario de pagos:** una financiación puede pagarse con un pago mensual
+  fijo o con un calendario, en el que capturas cada mes que muestra tu banco
+  con su monto. El saldo pendiente es la suma de los meses, y cada pago
+  vinculado cubre primero el mes más antiguo.
+- **Próximo pago de una tarjeta:** lo no financiado más las mensualidades del
+  mes, no la deuda total. Un plan sin pago mensual no se estima: se avisa que
+  falta capturarlo.
 - **Recurrencias:**
   - Sin duplicados (ocurrencias únicas por regla y fecha).
   - Un ingreso previsto no suma hasta que lo confirmas, salvo que actives el

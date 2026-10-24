@@ -29,6 +29,7 @@ describe('creditSummary', () => {
       plansCount: 1,
       plansWithoutMonthly: 0,
       revolving: 60000,
+      dueNow: 80000,
       unreconciled: 0,
     });
   });
@@ -49,6 +50,7 @@ describe('creditSummary', () => {
       plansCount: 0,
       plansWithoutMonthly: 0,
       revolving: 0,
+      dueNow: 0,
       unreconciled: 0,
     });
   });

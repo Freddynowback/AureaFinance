@@ -21,9 +21,25 @@ const SCHEMA_V2 = [
   'CREATE INDEX IF NOT EXISTS idx_tx_dupes ON transactions(account_id, kind, amount, occurred_at)',
 ];
 
+const SCHEMA_V3 = [
+  // Calendario de pagos capturado a mano (montos distintos por mes). Los meses
+  // que faltan definen el saldo pendiente del plan; los pagos vinculados se
+  // aplican a los meses más antiguos.
+  `CREATE TABLE debt_schedule_items (
+    id TEXT PRIMARY KEY,
+    debt_id TEXT NOT NULL REFERENCES debts(id) ON DELETE CASCADE,
+    due_date TEXT NOT NULL,
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    created_at TEXT NOT NULL,
+    UNIQUE (debt_id, due_date)
+  )`,
+  'CREATE INDEX idx_schedule_debt ON debt_schedule_items(debt_id, due_date)',
+];
+
 export const MIGRATIONS = [
   { version: 1, name: 'esquema_inicial', statements: SCHEMA_V1 },
   { version: 2, name: 'integridad_deuda_moneda', statements: SCHEMA_V2 },
+  { version: 3, name: 'calendario_pagos_deuda', statements: SCHEMA_V3 },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

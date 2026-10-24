@@ -63,7 +63,9 @@ export default function DebtPaymentPlan({ debt, today, context, onRegisterPaymen
   const outstanding = safeAmount(debt.outstanding);
   const reserved = safeAmount(debt.reserved);
   const paidTotal = safeAmount(debt.paid_total);
-  const initialDeadline = debt.effectiveDueDate || addDays(currentDay, 30);
+  // Con calendario, el plan termina en el último mes capturado, no en el del mes en curso.
+  const lastScheduled = debt.schedule && debt.schedule.pending.length ? debt.schedule.pending[debt.schedule.pending.length - 1].due_date : null;
+  const initialDeadline = lastScheduled || debt.effectiveDueDate || addDays(currentDay, 30);
   const [deadline, setDeadline] = useState(initialDeadline);
   const [frequency, setFrequency] = useState('monthly');
   const [selectedFrequency, setSelectedFrequency] = useState('monthly');
