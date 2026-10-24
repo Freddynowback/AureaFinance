@@ -1,4 +1,13 @@
-# Estado del proyecto — 24 de octubre de 2026 (versión 0.03)
+# Estado del proyecto — 24 de octubre de 2026 (versión 0.04)
+
+## Versión 0.04: recomendado = mensualidad en curso
+
+- **Corregido:** con calendario de meses distintos, "Recomendado por
+  periodo" (y el botón Apartar) usaba el importe que más se repetía en todo
+  el plan (p. ej. $266) en vez del mes en curso ($650). Ahora es lo que toca
+  para la mensualidad más próxima, y cada plan indica los cambios que siguen
+  ("luego $380, después $266"). Al pagar un mes, pasa al siguiente.
+- **Pruebas:** 252/252.
 
 ## Versión 0.03: recomendador por mensualidades
 

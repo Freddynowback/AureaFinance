@@ -1,3 +1,4 @@
+import { addMonths } from '../../utils/dates';
 import {
   assessPlan,
   buildInstallmentPlan,
@@ -217,7 +218,8 @@ describe('mensualidades', () => {
       { date: '2026-10-25', amount: 10000 },
       { date: '2026-11-01', amount: 10000 },
     ]);
-    expect(weekly.firstDue).toEqual({ date: '2026-11-01', count: 4, amount: 10000 });
+    expect(weekly.firstDue).toEqual({ date: '2026-11-01', count: 4, amount: 10000, short: false });
+    expect(weekly.later).toEqual([]);
   });
 
   test('si queda poco para la primera mensualidad, sus aportaciones son menos y más altas', () => {
@@ -226,8 +228,10 @@ describe('mensualidades', () => {
       { date: '2026-10-25', amount: 20000 },
       { date: '2026-11-01', amount: 20000 },
     ]);
-    expect(plan.perPeriod).toBe(10000);
-    expect(plan.firstDue).toEqual({ date: '2026-11-01', count: 2, amount: 20000 });
+    // Lo recomendado es lo que toca ahora; después baja a lo normal.
+    expect(plan.perPeriod).toBe(20000);
+    expect(plan.firstDue).toEqual({ date: '2026-11-01', count: 2, amount: 20000, short: true });
+    expect(plan.later).toEqual([{ date: '2026-12-01', amount: 10000 }]);
   });
 
   test('calendario con montos distintos y apartado aplicado a la mensualidad más próxima', () => {
@@ -240,6 +244,20 @@ describe('mensualidades', () => {
       { date: '2026-12-05', amount: 49000 },
     ]);
     expect(plan).toMatchObject({ reserved: 25000, toCover: 198000, total: 198000 });
+  });
+
+  test('calendario con meses distintos: lo recomendado es el mes en curso, no el importe más repetido', () => {
+    const months = [65000, 65000, 38000, 26600, 26600, 26600, 26600, 26600];
+    const pending = months.map((amount, i) => ({ due_date: addMonths('2026-11-05', i), amount }));
+    const [weekly, biweekly, monthly] = compareInstallmentPlans({ installments: pendingInstallments({ schedule: { pending } }), today: '2026-10-24' });
+    expect(monthly.perPeriod).toBe(65000);
+    expect(monthly.later).toEqual([{ date: '2027-01-05', amount: 38000 }, { date: '2027-02-05', amount: 26600 }]);
+    // Para el 5 nov solo cabe una quincena y dos semanas.
+    expect(biweekly).toMatchObject({ perPeriod: 65000, firstDue: { count: 1, short: true } });
+    expect(weekly).toMatchObject({ perPeriod: 32500, firstDue: { count: 2, short: true } });
+    // Pagado el primer mes, lo recomendado pasa al siguiente.
+    const next = buildInstallmentPlan({ installments: pendingInstallments({ schedule: { pending: pending.slice(2) } }), today: '2026-12-06', frequency: 'monthly' });
+    expect(next.perPeriod).toBe(38000);
   });
 
   test('mensualidad vencida: se aporta hoy', () => {

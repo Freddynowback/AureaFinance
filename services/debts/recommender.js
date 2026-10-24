@@ -99,26 +99,14 @@ export function pendingInstallments(debt) {
 // Aportaciones de cada mensualidad, en días antes de su fecha de pago.
 const CYCLE_OFFSETS = { weekly: [-21, -14, -7, 0], biweekly: [-15, 0], monthly: [0] };
 
-/** Importe que más se repite (el habitual por periodo); en empate, el mayor. */
-function usualAmount(amounts) {
-  const counts = new Map();
-  amounts.forEach(a => counts.set(a, (counts.get(a) || 0) + 1));
-  let best = 0;
-  let bestCount = 0;
-  counts.forEach((count, amount) => {
-    if (count > bestCount || (count === bestCount && amount > best)) {
-      best = amount;
-      bestCount = count;
-    }
-  });
-  return best;
-}
-
 /**
  * Plan que reparte CADA mensualidad en aportaciones antes de su fecha de pago:
  * $400 al mes = $200 por quincena = $100 por semana. Si para la primera queda
  * menos tiempo, sus aportaciones son menos y más altas. Lo apartado cubre
  * primero las mensualidades más próximas.
+ *
+ * `perPeriod` es lo que toca para la mensualidad más próxima (con calendario,
+ * cada mes es distinto); `later` lista los cambios de importe que siguen.
  */
 export function buildInstallmentPlan({ installments, reserved = 0, today, frequency }) {
   const offsets = CYCLE_OFFSETS[frequency];
@@ -149,8 +137,20 @@ export function buildInstallmentPlan({ installments, reserved = 0, today, freque
     if (last && last.date === e.date) last.amount += e.amount;
     else schedule.push({ ...e });
   }
-  const first = schedule.length ? schedule.filter(e => e.dueDate === schedule[0].dueDate) : [];
-  const perPeriod = usualAmount(schedule.map(e => e.amount));
+  // Aportación por periodo de cada mensualidad, en orden.
+  const cycles = [];
+  for (const e of schedule) {
+    const last = cycles[cycles.length - 1];
+    if (last && last.date === e.dueDate) {
+      last.count += 1;
+      last.amount = Math.max(last.amount, e.amount);
+    } else cycles.push({ date: e.dueDate, count: 1, amount: e.amount });
+  }
+  const later = [];
+  for (let i = 1; i < cycles.length && later.length < 2; i++) {
+    const prev = later.length ? later[later.length - 1].amount : cycles[0].amount;
+    if (cycles[i].amount !== prev) later.push({ date: cycles[i].date, amount: cycles[i].amount });
+  }
   return {
     frequency,
     label: PLAN_LABELS[frequency],
@@ -160,9 +160,10 @@ export function buildInstallmentPlan({ installments, reserved = 0, today, freque
     reserved: reservedUsed,
     toCover: totalDue - reservedUsed,
     periods: schedule.length,
-    perPeriod,
-    // Lo que toca para la mensualidad más próxima, si difiere de lo habitual.
-    firstDue: first.length ? { date: first[0].dueDate, count: first.length, amount: Math.max(...first.map(e => e.amount)) } : null,
+    perPeriod: cycles.length ? cycles[0].amount : 0,
+    // Mensualidad más próxima: fecha y cuántas aportaciones caben antes (menos que lo normal = queda poco tiempo).
+    firstDue: cycles.length ? { ...cycles[0], short: cycles[0].count < offsets.length } : null,
+    later,
     schedule: schedule.map(({ date, amount }) => ({ date, amount })),
     total: sum(schedule.map(e => e.amount)),
     overdue,

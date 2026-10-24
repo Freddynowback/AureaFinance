@@ -168,9 +168,11 @@ export default function DebtPaymentPlan({ debt, today, context, onRegisterPaymen
               <AppText variant="caption" color={colors.textSecondary}>
                 {plan.perLabel} · {plan.periods} {plan.periods === 1 ? 'periodo' : 'periodos'}
               </AppText>
-              {plan.firstDue && plan.firstDue.amount !== plan.perPeriod ? (
-                <AppText variant="caption" color={colors.gold}>
-                  Para el {formatDate(plan.firstDue.date)}: {plan.firstDue.count} × {formatMoney(plan.firstDue.amount)} (queda menos tiempo)
+              {plan.firstDue ? (
+                <AppText variant="caption" color={plan.firstDue.short ? colors.gold : colors.textSecondary}>
+                  Para el pago del {formatDate(plan.firstDue.date)}
+                  {plan.firstDue.short ? ` (${plan.firstDue.count} ${plan.firstDue.count === 1 ? 'aportación' : 'aportaciones'}: queda menos tiempo)` : ''}
+                  {plan.later && plan.later.length ? ` · ${plan.later.map((l, i) => `${i ? 'después' : 'luego'} ${formatMoney(l.amount)}`).join(', ')}` : ''}
                 </AppText>
               ) : null}
             </Card>
