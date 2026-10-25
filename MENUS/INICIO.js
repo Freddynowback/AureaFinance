@@ -35,14 +35,14 @@ import TransactionCard from '../components/TransactionCard';
 import BudgetProgress from '../components/BudgetProgress';
 import CategoryIcon from '../components/CategoryIcon';
 
-async function loadHome(db, { periodSettings, period, remainingMode, cushion, frequencies, includeLater }) {
+async function loadHome(db, { periodSettings, period, remainingMode, cushion, frequencies, includeLater, incomeOnly }) {
   const [summary, upcoming, budgets, recent, frequent, daily] = await Promise.all([
     getPeriodSummary(db, { periodSettings, period, remainingMode }),
     getUpcoming(db, { days: 31 }),
     listBudgetStatus(db, periodSettings),
     transactionsRepository.search(db, {}, { limit: 5 }),
     frequentExpenses(db, 4),
-    getDailyAllowance(db, { periodSettings, cushion, frequencies, includeLater }),
+    getDailyAllowance(db, { periodSettings, cushion, frequencies, includeLater, incomeOnly }),
   ]);
   return { summary, upcoming, budgets, recent, frequent, daily };
 }
@@ -63,8 +63,8 @@ export default function INICIO({ navigation }) {
   }, [periodSettings, offset]);
 
   const { data, loading, reload } = useQuery(
-    d => (period ? loadHome(d, { periodSettings, period, remainingMode: settings['circle.remainingBase'], cushion: settings['daily.cushion'], frequencies: settings['plan.frequency'], includeLater: settings['daily.includeLater'] }) : Promise.resolve(null)),
-    [period && period.start, period && period.end, settings && settings['circle.remainingBase'], settings && settings['daily.cushion'], settings && settings['plan.frequency'], settings && settings['daily.includeLater']],
+    d => (period ? loadHome(d, { periodSettings, period, remainingMode: settings['circle.remainingBase'], cushion: settings['daily.cushion'], frequencies: settings['plan.frequency'], includeLater: settings['daily.includeLater'], incomeOnly: settings['daily.incomeOnly'] }) : Promise.resolve(null)),
+    [period && period.start, period && period.end, settings && settings['circle.remainingBase'], settings && settings['daily.cushion'], settings && settings['plan.frequency'], settings && settings['daily.includeLater'], settings && settings['daily.incomeOnly']],
   );
 
   const openTx = useCallback(id => navigation.navigate(ROUTES.MOVIMIENTO_DETALLE, { id }), [navigation]);

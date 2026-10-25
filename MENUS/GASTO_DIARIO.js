@@ -44,9 +44,10 @@ export default function GASTO_DIARIO({ navigation }) {
   const cushionSetting = settings ? settings['daily.cushion'] : 0;
   const frequencies = settings ? settings['plan.frequency'] : null;
   const includeLater = settings ? settings['daily.includeLater'] !== false : true;
+  const incomeOnly = settings ? settings['daily.incomeOnly'] === true : false;
   const { data: a } = useQuery(
-    d => (periodSettings ? getDailyAllowance(d, { periodSettings, cushion: cushionSetting, frequencies, includeLater }) : Promise.resolve(null)),
-    [periodSettings, cushionSetting, frequencies, includeLater],
+    d => (periodSettings ? getDailyAllowance(d, { periodSettings, cushion: cushionSetting, frequencies, includeLater, incomeOnly }) : Promise.resolve(null)),
+    [periodSettings, cushionSetting, frequencies, includeLater, incomeOnly],
   );
   const [cushion, setCushion] = useState(null);
   const [planDate, setPlanDate] = useState(addDays(todayISO(), 1));
@@ -100,6 +101,11 @@ export default function GASTO_DIARIO({ navigation }) {
           Tu ingreso del {formatDate(a.pendingIncome.date, { withYear: false })} ({a.pendingIncome.name}) no se ha registrado: no cuenta hasta que lo confirmes en Ingresos.
         </AppText>
       ) : null}
+      {a.noIncomeForBase ? (
+        <AppText variant="small" color={colors.gold} style={styles.notice}>
+          No hay un ingreso registrado en los últimos dos meses: se reparte todo tu dinero disponible.
+        </AppText>
+      ) : null}
       {a.withoutPlan.length ? (
         <AppText variant="small" color={colors.gold} style={styles.notice}>
           Sin mensualidad capturada (no se incluye): {a.withoutPlan.join(', ')}. Captúrala en la deuda para que cuente.
@@ -128,7 +134,26 @@ export default function GASTO_DIARIO({ navigation }) {
             accessibilityLabel="Incluir pagos lejanos"
           />
         </View>
-        <Line label="Dinero disponible" sub="Saldo líquido menos lo apartado" value={formatMoney(a.available)} />
+        <View style={styles.line}>
+          <View style={styles.flex}>
+            <AppText variant="small">Usar solo lo que ingresó</AppText>
+            <AppText variant="caption" color={colors.textMuted}>
+              {incomeOnly ? 'Reparte lo que queda de tu último ingreso; lo que ya tenías antes no cuenta.' : 'Reparte todo tu dinero disponible.'}
+            </AppText>
+          </View>
+          <Switch
+            value={incomeOnly}
+            onValueChange={v => update({ 'daily.incomeOnly': v })}
+            trackColor={{ true: colors.teal, false: colors.border }}
+            thumbColor={colors.text}
+            accessibilityLabel="Usar solo lo que ingresó"
+          />
+        </View>
+        {a.baseMode === 'income' ? (
+          <Line label="Lo que queda de tu ingreso" sub={`Desde el ${formatDate(a.baseSince, { withYear: false })}; disponible total ${formatMoney(a.available)}`} value={formatMoney(a.base)} />
+        ) : (
+          <Line label="Dinero disponible" sub="Saldo líquido menos lo apartado" value={formatMoney(a.available)} />
+        )}
         {a.commitments.map(c => (
           <Line
             key={`${c.type}-${c.name}-${c.date}`}

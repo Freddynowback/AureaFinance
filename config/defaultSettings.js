@@ -31,6 +31,8 @@ export const DEFAULT_SETTINGS = {
   'daily.cushion': 0,
   // Repartir desde hoy los pagos lejanos (no solo en su último ciclo) en "Gasto de hoy".
   'daily.includeLater': true,
+  // Repartir solo lo que queda del último ingreso (no todo el disponible) en "Gasto de hoy".
+  'daily.incomeOnly': false,
   // Periodo elegido para apartar a cada deuda o tarjeta: { [id]: 'weekly' | 'biweekly' | 'monthly' }.
   'plan.frequency': {},
   'ui.reduceMotion': false,

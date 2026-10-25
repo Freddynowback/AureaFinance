@@ -1,4 +1,15 @@
-# Estado del proyecto — 25 de octubre de 2026 (versión 0.07)
+# Estado del proyecto — 25 de octubre de 2026 (versión 0.08)
+
+## Versión 0.08: usar solo lo que ingresó
+
+- **Switch "Usar solo lo que ingresó"** en "Gasto de hoy" (`daily.incomeOnly`,
+  apagado por defecto). Encendido, la base no es todo el disponible sino lo
+  que queda del último ingreso: cuánto cambió el dinero líquido desde el día
+  de ese ingreso (nunca más que el disponible). Lo que ya tenías antes no
+  cuenta. Sin ingreso en los últimos 62 días se usa todo el disponible y se
+  avisa. Lo demás (apartar, colchón, planeados, días hasta el próximo
+  ingreso) no cambia.
+- **Pruebas:** 265/265.
 
 ## Versión 0.07: incluir pagos lejanos
 

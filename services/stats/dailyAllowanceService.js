@@ -4,7 +4,8 @@
  * lo que un día se gasta de más (o de menos) se reparte solo en los días
  * restantes.
  *
- *   libre   = dinero disponible − lo que toca apartar antes del próximo
+ *   libre   = dinero disponible (o, con `incomeOnly`, lo que queda del último
+ *             ingreso) − lo que toca apartar antes del próximo
  *             ingreso − colchón − gastos planeados
  *   por día = libre ÷ días hasta el próximo ingreso
  *
@@ -24,6 +25,7 @@ import { uuid } from '../../utils/id';
 import { check, throwIfErrors } from '../../utils/errors';
 import { getPeriod } from '../../utils/periods';
 import { getAccountsOverview } from '../accounts/accountService';
+import { isLiquidAccount } from '../transactions/rules';
 import { buildInstallmentPlan, pendingInstallments, planFrequency } from '../debts/recommender';
 import { loadDebtsWithPayments } from '../debts/schedule';
 
@@ -57,6 +59,33 @@ async function findHorizon(db, today, periodSettings) {
 }
 
 /**
+ * Lo que queda de lo que entró desde el último ingreso: cuánto cambió el
+ * dinero líquido desde ese día (el ingreso menos lo que salió desde entonces).
+ * Lo que ya tenías antes de ese ingreso no cuenta. null si no hay ingreso.
+ */
+async function sinceLastIncome(db, today, accounts) {
+  const row = await db.get(
+    "SELECT MAX(occurred_at) AS d FROM transactions WHERE kind = 'income' AND occurred_at >= ? AND occurred_at < ?",
+    [addDays(today, -62), addDays(today, 1)],
+  );
+  if (!row || !row.d) return null;
+  const since = row.d.slice(0, 10);
+  let amount = 0;
+  for (const a of accounts.filter(isLiquidAccount)) {
+    const from = a.initial_balance_date > since ? a.initial_balance_date : since;
+    // Misma regla que BALANCE_SQL, solo con los movimientos desde ese día.
+    const r = await db.get(
+      `SELECT COALESCE(SUM(CASE WHEN account_id = ? THEN (CASE WHEN kind IN ('income','refund','adjustment') THEN amount ELSE -amount END) ELSE 0 END), 0)
+            + COALESCE(SUM(CASE WHEN to_account_id = ? THEN amount ELSE 0 END), 0) AS delta
+       FROM transactions WHERE (account_id = ? OR to_account_id = ?) AND occurred_at >= ?`,
+      [a.id, a.id, a.id, a.id, from],
+    );
+    amount += r.delta;
+  }
+  return { since, amount };
+}
+
+/**
  * Lo que toca apartar antes del horizonte: lo que el plan pide tener apartado
  * para esa fecha menos lo que ya apartaste (si ya apartaste lo de esta semana,
  * no se vuelve a pedir).
@@ -67,7 +96,7 @@ function setAsideBefore(installments, reserved, today, frequency, horizon, sprea
   return { amount: Math.max(0, target - reserved), toCover: Math.max(0, plan.toCover - reserved), dueDate: plan.firstDue ? plan.firstDue.date : null };
 }
 
-export async function getDailyAllowance(db, { today = todayISO(), periodSettings, cushion = 0, frequencies = {}, includeLater = true } = {}) {
+export async function getDailyAllowance(db, { today = todayISO(), periodSettings, cushion = 0, frequencies = {}, includeLater = true, incomeOnly = false } = {}) {
   const { horizon, source, income, pendingIncome } = await findHorizon(db, today, periodSettings);
   const days = Math.max(1, diffDays(today, horizon));
   const [overview, debts, expenses, planned] = await Promise.all([
@@ -117,7 +146,12 @@ export async function getDailyAllowance(db, { today = todayISO(), periodSettings
   const plannedToday = planned.filter(p => p.planned_date === today).reduce((s, p) => s + p.amount, 0);
   const safeCushion = Math.max(0, cushion || 0);
   // Libre ahora (ya descontado lo de hoy) y al empezar el día (sumando de vuelta lo gastado hoy).
-  const freeNow = overview.available - committed - safeCushion;
+  // Base: todo el disponible o, con incomeOnly, solo lo que queda del último ingreso (nunca más que el disponible).
+  const fromIncome = incomeOnly
+    ? await sinceLastIncome(db, today, overview.accounts.filter(a => a.currency === overview.currency))
+    : null;
+  const base = fromIncome ? Math.max(0, Math.min(overview.available, fromIncome.amount)) : overview.available;
+  const freeNow = base - committed - safeCushion;
   const freeStart = freeNow + spentToday;
   const pool = freeStart - plannedTotal;
   const perDay = pool > 0 ? Math.floor(pool / days / 100) * 100 : 0;
@@ -144,6 +178,12 @@ export async function getDailyAllowance(db, { today = todayISO(), periodSettings
     pendingIncome: pendingIncome ? { name: pendingIncome.name, date: pendingIncome.due_date } : null,
     days,
     available: overview.available,
+    // 'income': solo lo que queda del último ingreso; 'all': todo el disponible.
+    baseMode: fromIncome ? 'income' : 'all',
+    base,
+    baseSince: fromIncome ? fromIncome.since : null,
+    // Pediste "solo lo del ingreso" pero no hay ingreso registrado: se usa todo el disponible.
+    noIncomeForBase: incomeOnly && !fromIncome,
     hasAccounts: overview.hasAccounts,
     commitments,
     committed,

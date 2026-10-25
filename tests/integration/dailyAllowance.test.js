@@ -167,3 +167,20 @@ test('incluir pagos lejanos: el próximo pago se reparte desde hoy aunque venza 
   expect(c.amount).toBeGreaterThanOrEqual(13000);
   expect(c.amount).toBeLessThanOrEqual(13200);
 });
+
+test('usar solo lo que ingresó: reparte lo que queda del último ingreso, no lo que ya tenías', async () => {
+  // Sin ingreso registrado: se usa todo el disponible y se avisa.
+  let a = await allowance({ incomeOnly: true });
+  expect(a.noIncomeForBase).toBe(true);
+  expect(a.base).toBe(600000);
+  // Ingreso de $2,000 el 20 oct y $500 de gasto después: quedan $1,500 de ese ingreso.
+  await createTransaction(db, { kind: 'income', amount: 200000, account_id: debit.id, occurred_at: '2026-10-20 09:00:00' });
+  await spend(50000, debit, '2026-10-22 12:00:00');
+  // Con tarjeta no baja lo líquido: no cuenta aquí (se aparta con el plan de la tarjeta).
+  await spend(30000, nu, '2026-10-22 13:00:00');
+  a = await allowance({ incomeOnly: true });
+  expect(a).toMatchObject({ baseMode: 'income', baseSince: '2026-10-20', base: 150000, available: 750000 });
+  expect(a.free).toBe(150000 - 52900 - 44700);
+  // Apagado: todo el disponible.
+  expect((await allowance()).base).toBe(750000);
+});
