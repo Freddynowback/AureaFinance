@@ -109,6 +109,10 @@ export function pendingInstallments(debt) {
 // Aportaciones de cada mensualidad, en días antes de su fecha de pago.
 const CYCLE_OFFSETS = { weekly: [-21, -14, -7, 0], biweekly: [-15, 0], monthly: [0] };
 
+// k-ésima fecha de aportación antes de una mensualidad, al ritmo del periodo.
+const cycleBack = (date, frequency, k) =>
+  frequency === 'monthly' ? addMonths(date, -k) : addDays(date, -k * (frequency === 'weekly' ? 7 : 15));
+
 /**
  * Plan que reparte CADA mensualidad en aportaciones antes de su fecha de pago:
  * $400 al mes = $200 por quincena = $100 por semana. Si para la primera queda
@@ -118,8 +122,10 @@ const CYCLE_OFFSETS = { weekly: [-21, -14, -7, 0], biweekly: [-15, 0], monthly: 
  * `perPeriod` es lo que toca para la mensualidad más próxima (con calendario,
  * cada mes es distinto); `later` lista los cambios de importe que siguen.
  */
-export function buildInstallmentPlan({ installments, reserved = 0, today, frequency }) {
+export function buildInstallmentPlan({ installments, reserved = 0, today, frequency, spreadFirst = false }) {
   const offsets = CYCLE_OFFSETS[frequency];
+  // spreadFirst: la mensualidad más próxima se reparte desde hoy (no solo en su ciclo), para empezar a apartar ya.
+  let spread = spreadFirst;
   const totalDue = sum(installments.map(i => i.amount));
   let credit = Math.min(Math.max(0, reserved), totalDue);
   const reservedUsed = credit;
@@ -135,6 +141,11 @@ export function buildInstallmentPlan({ installments, reserved = 0, today, freque
     if (amount <= 0) continue;
     if (inst.date < today) overdue = true;
     let dates = offsets.map(o => addDays(inst.date, o)).filter(d => d >= today && (!after || d > after));
+    if (spread) {
+      spread = false;
+      dates = [];
+      for (let k = 0, d = inst.date; d >= today && (!after || d > after) && k < 520; d = cycleBack(inst.date, frequency, ++k)) dates.unshift(d);
+    }
     if (!dates.length) dates = [inst.date < today ? today : inst.date];
     const unit = amount >= dates.length * 100 ? 100 : 1;
     const parts = splitEvenly(amount, dates.length, unit);

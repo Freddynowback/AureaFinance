@@ -3,7 +3,7 @@
  * gastos planeados (p. ej. una salida el sábado).
  */
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Switch, View } from 'react-native';
 import { colors, radii, spacing } from '../config/theme';
 import { ROUTES } from '../navigation/routes';
 import { useDb } from '../hooks/DatabaseProvider';
@@ -43,9 +43,10 @@ export default function GASTO_DIARIO({ navigation }) {
   const { submit, saving, errors } = useSubmit();
   const cushionSetting = settings ? settings['daily.cushion'] : 0;
   const frequencies = settings ? settings['plan.frequency'] : null;
+  const includeLater = settings ? settings['daily.includeLater'] !== false : true;
   const { data: a } = useQuery(
-    d => (periodSettings ? getDailyAllowance(d, { periodSettings, cushion: cushionSetting, frequencies }) : Promise.resolve(null)),
-    [periodSettings, cushionSetting, frequencies],
+    d => (periodSettings ? getDailyAllowance(d, { periodSettings, cushion: cushionSetting, frequencies, includeLater }) : Promise.resolve(null)),
+    [periodSettings, cushionSetting, frequencies, includeLater],
   );
   const [cushion, setCushion] = useState(null);
   const [planDate, setPlanDate] = useState(addDays(todayISO(), 1));
@@ -112,6 +113,21 @@ export default function GASTO_DIARIO({ navigation }) {
 
       <SectionHeader title="Cómo se calcula" />
       <Card animate={false}>
+        <View style={styles.line}>
+          <View style={styles.flex}>
+            <AppText variant="small">Incluir pagos lejanos</AppText>
+            <AppText variant="caption" color={colors.textMuted}>
+              {includeLater ? 'El próximo pago de cada tarjeta y deuda se aparta desde hoy, aunque venza mucho después.' : 'Solo se aparta en los periodos previos a cada pago.'}
+            </AppText>
+          </View>
+          <Switch
+            value={includeLater}
+            onValueChange={v => update({ 'daily.includeLater': v })}
+            trackColor={{ true: colors.teal, false: colors.border }}
+            thumbColor={colors.text}
+            accessibilityLabel="Incluir pagos lejanos"
+          />
+        </View>
         <Line label="Dinero disponible" sub="Saldo líquido menos lo apartado" value={formatMoney(a.available)} />
         {a.commitments.map(c => (
           <Line

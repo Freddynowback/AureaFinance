@@ -29,6 +29,8 @@ export const DEFAULT_SETTINGS = {
   'notifications.dailyReminderHour': 21,
   // Colchón para imprevistos que no cuenta en "¿Cuánto puedo gastar hoy?" (centavos).
   'daily.cushion': 0,
+  // Repartir desde hoy los pagos lejanos (no solo en su último ciclo) en "Gasto de hoy".
+  'daily.includeLater': true,
   // Periodo elegido para apartar a cada deuda o tarjeta: { [id]: 'weekly' | 'biweekly' | 'monthly' }.
   'plan.frequency': {},
   'ui.reduceMotion': false,

@@ -11,6 +11,8 @@
  * "Lo que toca apartar" sale del plan de pago de cada tarjeta y deuda con el
  * periodo que eligió el usuario (semanal, quincenal o mensual): las
  * aportaciones con fecha antes del ingreso. Lo ya apartado cubre primero.
+ * Con `includeLater`, el pago más próximo de cada una se reparte desde hoy:
+ * así también aparecen los que vencen mucho después del ingreso.
  *
  * Solo usa la FECHA del próximo ingreso, no su monto: ese dinero aún no llega.
  * Las compras financiadas (a meses) no cuentan: cuenta su mensualidad.
@@ -59,13 +61,13 @@ async function findHorizon(db, today, periodSettings) {
  * para esa fecha menos lo que ya apartaste (si ya apartaste lo de esta semana,
  * no se vuelve a pedir).
  */
-function setAsideBefore(installments, reserved, today, frequency, horizon) {
-  const plan = buildInstallmentPlan({ installments, today, frequency });
+function setAsideBefore(installments, reserved, today, frequency, horizon, spreadFirst) {
+  const plan = buildInstallmentPlan({ installments, today, frequency, spreadFirst });
   const target = plan.schedule.filter(e => e.date < horizon).reduce((s, e) => s + e.amount, 0);
   return { amount: Math.max(0, target - reserved), toCover: Math.max(0, plan.toCover - reserved), dueDate: plan.firstDue ? plan.firstDue.date : null };
 }
 
-export async function getDailyAllowance(db, { today = todayISO(), periodSettings, cushion = 0, frequencies = {} } = {}) {
+export async function getDailyAllowance(db, { today = todayISO(), periodSettings, cushion = 0, frequencies = {}, includeLater = true } = {}) {
   const { horizon, source, income, pendingIncome } = await findHorizon(db, today, periodSettings);
   const days = Math.max(1, diffDays(today, horizon));
   const [overview, debts, expenses, planned] = await Promise.all([
@@ -86,7 +88,7 @@ export async function getDailyAllowance(db, { today = todayISO(), periodSettings
     const revolving = a.credit ? Math.min(a.credit.revolving, a.debt) : a.debt;
     if (!(revolving > 0) || !a.nextDue) continue;
     const frequency = planFrequency(frequencies, a.id, periodType);
-    const part = setAsideBefore([{ date: a.nextDue, amount: revolving }], 0, today, frequency, horizon);
+    const part = setAsideBefore([{ date: a.nextDue, amount: revolving }], 0, today, frequency, horizon, includeLater);
     if (part.amount > 0) commitments.push({ type: 'card', name: a.name, date: a.nextDue, amount: part.amount, frequency, partial: part.amount < revolving, accountId: a.id });
     const left = revolving - part.amount;
     if (left > 0 && a.nextDue < addDays(horizon, AFTER_INCOME_DAYS)) {
@@ -101,7 +103,7 @@ export async function getDailyAllowance(db, { today = todayISO(), periodSettings
       continue;
     }
     const frequency = planFrequency(frequencies, d.id, periodType);
-    const part = setAsideBefore(installments, d.reserved || 0, today, frequency, horizon);
+    const part = setAsideBefore(installments, d.reserved || 0, today, frequency, horizon, includeLater);
     if (part.amount > 0) commitments.push({ type: 'debt', name: d.name, date: part.dueDate, amount: part.amount, frequency, partial: part.amount < part.toCover, debtId: d.id });
   }
   for (const o of expenses) commitments.push({ type: 'recurring', name: o.name, date: o.due_date, amount: o.amount, occurrenceId: o.id });

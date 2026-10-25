@@ -153,3 +153,17 @@ test('una deuda sin mensualidad capturada no se estima: se avisa', async () => {
   expect(a.withoutPlan).toEqual(['Préstamo']);
   expect(a.commitments.find(c => c.type === 'debt')).toBeUndefined();
 });
+
+test('incluir pagos lejanos: el próximo pago se reparte desde hoy aunque venza mucho después', async () => {
+  const moradita = await createDebt(db, { name: 'Moradita', account_id: nu.id, balance: 65170, monthly_payment: 65170, next_due_date: '2026-11-23', addToCardDebt: false });
+  const freq = { [moradita.id]: 'weekly' };
+  // Apagado: sus 4 semanas empiezan el 2 nov, después de la quincena.
+  const off = await allowance({ frequencies: freq, includeLater: false });
+  expect(off.commitments.find(c => c.name === 'Moradita')).toBeUndefined();
+  // Encendido: 5 semanas desde el 26 oct; antes de la quincena toca una.
+  const on = await allowance({ frequencies: freq, includeLater: true });
+  const c = on.commitments.find(x => x.name === 'Moradita');
+  expect(c).toMatchObject({ date: '2026-11-23', partial: true, frequency: 'weekly' });
+  expect(c.amount).toBeGreaterThanOrEqual(13000);
+  expect(c.amount).toBeLessThanOrEqual(13200);
+});

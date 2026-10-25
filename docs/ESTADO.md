@@ -1,4 +1,16 @@
-# Estado del proyecto — 25 de octubre de 2026 (versión 0.06)
+# Estado del proyecto — 25 de octubre de 2026 (versión 0.07)
+
+## Versión 0.07: incluir pagos lejanos
+
+- **Switch "Incluir pagos lejanos"** en "Gasto de hoy" (`daily.includeLater`,
+  encendido por defecto). Encendido, el pago más próximo de cada tarjeta y
+  deuda se reparte desde hoy hasta su fecha (`buildInstallmentPlan` con
+  `spreadFirst`), así también aparecen los que vencen semanas después del
+  ingreso. Apagado, solo se aparta en los periodos previos a cada pago
+  (comportamiento de la v0.06). El plan de pago de la deuda no cambia.
+- **Pendiente (no se pidió):** una tarjeta con saldo sin día límite de pago no
+  se incluye ni avisa.
+- **Pruebas:** 264/264.
 
 ## Versión 0.06: apartar para todas las tarjetas y deudas
 
