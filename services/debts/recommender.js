@@ -21,6 +21,16 @@ export const PLAN_LABELS = {
   monthly: 'Mensual',
 };
 
+/**
+ * Periodo guardado para apartar a una deuda o tarjeta; sin elección, el del
+ * círculo financiero (semanal si el círculo no es semanal, quincenal ni mensual).
+ */
+export function planFrequency(frequencies, id, periodType) {
+  const saved = frequencies && frequencies[id];
+  if (PLAN_FREQUENCIES.includes(saved)) return saved;
+  return PLAN_FREQUENCIES.includes(periodType) ? periodType : 'weekly';
+}
+
 const PER_LABEL = { weekly: 'por semana', biweekly: 'por quincena', monthly: 'al mes' };
 
 /** Fechas de aportación entre mañana y la fecha límite (incluida). */

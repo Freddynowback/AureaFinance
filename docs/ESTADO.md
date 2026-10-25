@@ -1,4 +1,20 @@
-# Estado del proyecto — 24 de octubre de 2026 (versión 0.05)
+# Estado del proyecto — 25 de octubre de 2026 (versión 0.06)
+
+## Versión 0.06: apartar para todas las tarjetas y deudas
+
+- **"Gasto de hoy"** resta de cada tarjeta (lo no financiado) y de cada
+  financiación lo que toca apartar antes del próximo ingreso según su plan:
+  las aportaciones con fecha anterior al ingreso (`buildInstallmentPlan`),
+  menos lo ya apartado. Antes solo restaba lo que vencía antes del ingreso y
+  lo apartado se descontaba dos veces (del disponible y otra vez del pago).
+- **El periodo se guarda** (`plan.frequency` en `settings`, por id): en el plan
+  de pago de la deuda y en un selector nuevo de la tarjeta ("Apartar para el
+  pago"). Sin elección, se usa el periodo del círculo (semanal si no es
+  semanal, quincenal ni mensual).
+- **Quitado:** la línea "Compras con tarjeta"; ahora esas compras van en el
+  saldo de la tarjeta y se apartan con su plan.
+- **Sin mensualidad capturada** la deuda no se estima: se avisa.
+- **Pruebas:** 263/263 (2 nuevas, 3 ajustadas en `dailyAllowance.test.js`).
 
 ## Versión 0.05: "¿Cuánto puedo gastar hoy?"
 

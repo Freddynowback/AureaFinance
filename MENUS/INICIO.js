@@ -35,14 +35,14 @@ import TransactionCard from '../components/TransactionCard';
 import BudgetProgress from '../components/BudgetProgress';
 import CategoryIcon from '../components/CategoryIcon';
 
-async function loadHome(db, { periodSettings, period, remainingMode, cushion }) {
+async function loadHome(db, { periodSettings, period, remainingMode, cushion, frequencies }) {
   const [summary, upcoming, budgets, recent, frequent, daily] = await Promise.all([
     getPeriodSummary(db, { periodSettings, period, remainingMode }),
     getUpcoming(db, { days: 31 }),
     listBudgetStatus(db, periodSettings),
     transactionsRepository.search(db, {}, { limit: 5 }),
     frequentExpenses(db, 4),
-    getDailyAllowance(db, { periodSettings, cushion }),
+    getDailyAllowance(db, { periodSettings, cushion, frequencies }),
   ]);
   return { summary, upcoming, budgets, recent, frequent, daily };
 }
@@ -63,8 +63,8 @@ export default function INICIO({ navigation }) {
   }, [periodSettings, offset]);
 
   const { data, loading, reload } = useQuery(
-    d => (period ? loadHome(d, { periodSettings, period, remainingMode: settings['circle.remainingBase'], cushion: settings['daily.cushion'] }) : Promise.resolve(null)),
-    [period && period.start, period && period.end, settings && settings['circle.remainingBase'], settings && settings['daily.cushion']],
+    d => (period ? loadHome(d, { periodSettings, period, remainingMode: settings['circle.remainingBase'], cushion: settings['daily.cushion'], frequencies: settings['plan.frequency'] }) : Promise.resolve(null)),
+    [period && period.start, period && period.end, settings && settings['circle.remainingBase'], settings && settings['daily.cushion'], settings && settings['plan.frequency']],
   );
 
   const openTx = useCallback(id => navigation.navigate(ROUTES.MOVIMIENTO_DETALLE, { id }), [navigation]);

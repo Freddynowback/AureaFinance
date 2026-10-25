@@ -1,7 +1,7 @@
 import { openTestDb, categoryId, makeAccount } from '../helpers/testDb';
 import { createRule } from '../../services/recurring/recurringService';
 import { createTransaction } from '../../services/transactions/transactionService';
-import { createDebt } from '../../services/debts/debtService';
+import { createDebt, reserveForDebt } from '../../services/debts/debtService';
 import { addPlannedSpend, deletePlannedSpend, getDailyAllowance } from '../../services/stats/dailyAllowanceService';
 
 const TODAY = '2026-10-24';
@@ -54,13 +54,17 @@ test('si un día gastas de más, el resto de los días baja solo', async () => {
   expect(next.perDay).toBe(63700);
 });
 
-test('con tarjeta también cuenta, aunque no baje el saldo líquido', async () => {
+test('con tarjeta también cuenta: con plan semanal se aparta desde ya para su pago', async () => {
   await spend(30000, nu);
-  const a = await allowance();
+  const a = await allowance({ frequencies: { [nu.id]: 'weekly' } });
   expect(a.available).toBe(600000);
   expect(a.spentToday).toBe(30000);
-  expect(a.cardSpending).toBe(30000);
-  expect(a.tomorrowPerDay).toBe(78700); // ($5,024 − $300) / 6
+  // $5,300 para el 5 nov en semanas: aportaciones el 29 oct y el 5 nov; antes de la quincena toca la primera.
+  expect(a.commitments.find(c => c.type === 'card')).toMatchObject({ name: 'NU', date: '2026-11-05', amount: 265000, frequency: 'weekly', partial: true });
+  expect(a.afterIncome).toEqual([expect.objectContaining({ name: 'NU', amount: 265000 })]);
+  // Con plan mensual se paga entero el 5 nov: no se aparta nada antes de la quincena.
+  const monthly = await allowance({ frequencies: { [nu.id]: 'monthly' } });
+  expect(monthly.commitments.find(c => c.type === 'card')).toBeUndefined();
 });
 
 test('una compra a meses no cuenta como gasto del día (cuenta su mensualidad)', async () => {
@@ -69,7 +73,6 @@ test('una compra a meses no cuenta como gasto del día (cuenta su mensualidad)',
   await db.run('UPDATE debts SET origin_transaction_id = ? WHERE id = ?', [tx.id, debt.id]);
   const a = await allowance();
   expect(a.spentToday).toBe(0);
-  expect(a.cardSpending).toBe(0);
   expect(a.perDay).toBe(71700);
 });
 
@@ -77,8 +80,9 @@ test('una tarjeta que vence antes del ingreso se descuenta con lo que toca pagar
   await db.run('UPDATE accounts SET payment_due_day = 28 WHERE id = ?', [nu.id]);
   await createDebt(db, { name: 'Audífonos', account_id: nu.id, balance: 60000, monthly_payment: 10000, next_due_date: '2026-10-28', addToCardDebt: false });
   const a = await allowance();
-  // $5,000 de deuda: $4,400 sin financiar + $100 de mensualidad = $4,500.
-  expect(a.commitments.find(c => c.type === 'card')).toMatchObject({ name: 'NU', date: '2026-10-28', amount: 450000 });
+  // $5,000 de deuda: $4,400 sin financiar + $100 de la mensualidad = $4,500.
+  expect(a.commitments.find(c => c.type === 'card')).toMatchObject({ name: 'NU', date: '2026-10-28', amount: 440000, partial: false });
+  expect(a.commitments.find(c => c.type === 'debt')).toMatchObject({ name: 'Audífonos', date: '2026-10-28', amount: 10000 });
   expect(a.afterIncome).toEqual([]);
   expect(a.free).toBe(600000 - 52900 - 450000 - 44700);
 });
@@ -125,4 +129,27 @@ test('sin ingreso recurrente reparte hasta el fin del periodo; un ingreso sin co
   a = await allowance();
   expect(a.pendingIncome).toEqual({ name: 'Pago', date: '2026-10-15' });
   expect(a.horizon).toBe('2026-10-31');
+});
+
+test('todas las deudas: se aparta según el periodo elegido y lo apartado no se descuenta dos veces', async () => {
+  const laptop = await createDebt(db, { name: 'Laptop', account_id: nu.id, balance: 1200000, monthly_payment: 100000, next_due_date: '2026-11-05', addToCardDebt: false });
+  // Mensual (el del círculo): la mensualidad del 5 nov se paga con la quincena.
+  let a = await allowance();
+  expect(a.commitments.find(c => c.type === 'debt')).toBeUndefined();
+  // Semanal: $1,000 en dos aportaciones (29 oct y 5 nov); antes de la quincena, $500.
+  a = await allowance({ frequencies: { [laptop.id]: 'weekly' } });
+  expect(a.commitments.find(c => c.type === 'debt')).toMatchObject({ name: 'Laptop', date: '2026-11-05', amount: 50000, frequency: 'weekly', partial: true });
+  // Si ya apartaste los $500 de esta semana, salen del disponible y no se vuelven a pedir.
+  await reserveForDebt(db, laptop.id, 50000);
+  const after = await allowance({ frequencies: { [laptop.id]: 'weekly' } });
+  expect(after.available).toBe(600000 - 50000);
+  expect(after.commitments.find(c => c.type === 'debt')).toBeUndefined();
+  expect(after.free).toBe(a.free);
+});
+
+test('una deuda sin mensualidad capturada no se estima: se avisa', async () => {
+  await createDebt(db, { name: 'Préstamo', account_id: nu.id, balance: 300000, addToCardDebt: false });
+  const a = await allowance();
+  expect(a.withoutPlan).toEqual(['Préstamo']);
+  expect(a.commitments.find(c => c.type === 'debt')).toBeUndefined();
 });

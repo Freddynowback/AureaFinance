@@ -63,7 +63,7 @@ function Schedule({ schedule }) {
   );
 }
 
-export default function DebtPaymentPlan({ debt, today, context, onRegisterPayment, onReserve }) {
+export default function DebtPaymentPlan({ debt, today, context, onRegisterPayment, onReserve, initialFrequency = 'monthly', onFrequencyChange }) {
   const currentDay = today || todayISO();
   const outstanding = safeAmount(debt.outstanding);
   const reserved = safeAmount(debt.reserved);
@@ -76,8 +76,8 @@ export default function DebtPaymentPlan({ debt, today, context, onRegisterPaymen
   const byInstallments = goal === 'installments' && !!installments;
   const [chosenDeadline, setDeadline] = useState(initialDeadline);
   const deadline = byInstallments ? lastInstallment : chosenDeadline;
-  const [frequency, setFrequency] = useState('monthly');
-  const [selectedFrequency, setSelectedFrequency] = useState('monthly');
+  const [frequency, setFrequency] = useState(initialFrequency);
+  const [selectedFrequency, setSelectedFrequency] = useState(initialFrequency);
   const [comfortAmount, setComfortAmount] = useState(null);
 
   const plans = useMemo(
@@ -118,6 +118,8 @@ export default function DebtPaymentPlan({ debt, today, context, onRegisterPaymen
   const selectFrequency = value => {
     setFrequency(value);
     setSelectedFrequency(value);
+    // Se guarda: "Gasto de hoy" aparta con este periodo.
+    if (onFrequencyChange) onFrequencyChange(value);
   };
 
   return (
@@ -153,10 +155,7 @@ export default function DebtPaymentPlan({ debt, today, context, onRegisterPaymen
           return (
             <Card
               key={value}
-              onPress={() => {
-                setSelectedFrequency(value);
-                setFrequency(value);
-              }}
+              onPress={() => selectFrequency(value)}
               index={FREQUENCY_OPTIONS.findIndex(option => option.value === value)}
               style={[styles.planCard, selected && styles.selectedPlan]}
               accessibilityLabel={`${plan.label}: ${formatMoney(plan.perPeriod)} ${plan.perLabel}, ${plan.periods} periodos${selected ? ', seleccionado' : ''}`}>

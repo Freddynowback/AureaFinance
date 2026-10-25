@@ -7,13 +7,15 @@ import { colors, spacing } from '../config/theme';
 import { ROUTES } from '../navigation/routes';
 import { useDb } from '../hooks/DatabaseProvider';
 import { useQuery } from '../hooks/useQuery';
+import { useSettings } from '../hooks/useSettings';
 import { useSubmit } from '../hooks/useSubmit';
 import { transactionsRepository } from '../database/repositories/transactionsRepository';
 import { accountsRepository } from '../database/repositories/accountsRepository';
 import { archiveAccount, deleteAccount, getAccountsOverview, reconcileAccount } from '../services/accounts/accountService';
 import { listDebts } from '../services/debts/debtService';
+import { buildInstallmentPlan, PLAN_FREQUENCIES, PLAN_LABELS, planFrequency } from '../services/debts/recommender';
 import { ACCOUNT_TYPE_LABELS } from '../services/transactions/rules';
-import { formatDate } from '../utils/dates';
+import { formatDate, todayISO } from '../utils/dates';
 import { formatMoney } from '../utils/money';
 import AmountField from '../components/common/AmountField';
 import AppText from '../components/common/AppText';
@@ -24,6 +26,7 @@ import EmptyState from '../components/common/EmptyState';
 import ListRow from '../components/common/ListRow';
 import Screen from '../components/common/Screen';
 import SectionHeader from '../components/common/SectionHeader';
+import Segmented from '../components/common/Segmented';
 import Sheet from '../components/common/Sheet';
 import TextField from '../components/common/TextField';
 import TransactionCard from '../components/TransactionCard';
@@ -47,6 +50,7 @@ export default function CUENTA_DETALLE({ navigation, route }) {
   const id = route.params.id;
   const { data, loading } = useQuery(d => load(d, id), [id]);
   const { submit, saving, errors } = useSubmit();
+  const { settings, update } = useSettings();
   const [reconcile, setReconcile] = useState(false);
   const [actual, setActual] = useState(null);
   const [note, setNote] = useState('');
@@ -57,6 +61,12 @@ export default function CUENTA_DETALLE({ navigation, route }) {
   const a = data.account;
   const isCredit = a.type === 'credit';
   const debt = Math.max(0, -a.balance);
+  // Plan para el pago de lo no financiado (las financiaciones tienen el suyo).
+  const revolving = isCredit && a.credit ? Math.min(a.credit.revolving, debt) : 0;
+  const frequency = settings ? planFrequency(settings['plan.frequency'], id, settings['period.type']) : null;
+  const cardPlan = revolving > 0 && a.nextDue && frequency
+    ? buildInstallmentPlan({ installments: [{ date: a.nextDue, amount: revolving }], today: todayISO(), frequency })
+    : null;
 
   return (
     <Screen>
@@ -70,6 +80,20 @@ export default function CUENTA_DETALLE({ navigation, route }) {
           <AppText variant="caption" color={colors.gold} style={styles.mt}>
             {a.nextStatement ? `Próximo corte ${formatDate(a.nextStatement)}` : ''}{a.nextStatement && a.nextDue ? ' · ' : ''}{a.nextDue ? `Pago límite ${formatDate(a.nextDue)}` : ''}
           </AppText>
+        ) : null}
+        {cardPlan ? (
+          <View style={styles.mtLg}>
+            <AppText variant="label" color={colors.textSecondary}>Apartar para el pago</AppText>
+            <Segmented
+              options={PLAN_FREQUENCIES.map(v => ({ value: v, label: PLAN_LABELS[v] }))}
+              value={frequency}
+              onChange={f => update({ 'plan.frequency': { ...settings['plan.frequency'], [id]: f } })}
+              style={styles.mt}
+            />
+            <AppText variant="caption" color={colors.textSecondary} style={styles.mt}>
+              Aparta {formatMoney(cardPlan.perPeriod, a.currency)} {cardPlan.perLabel} ({cardPlan.periods} {cardPlan.periods === 1 ? 'aportación' : 'aportaciones'}) para pagar {formatMoney(revolving, a.currency)} el {formatDate(a.nextDue)}. Se usa en "Gasto de hoy".
+            </AppText>
+          </View>
         ) : null}
         <AppText variant="caption" color={colors.textMuted} style={styles.mt}>
           Saldo inicial {formatMoney(isCredit ? -a.initial_balance : a.initial_balance, a.currency)} al {formatDate(a.initial_balance_date)} + {data.count} movimientos.

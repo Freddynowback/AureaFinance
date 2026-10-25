@@ -10,6 +10,7 @@ import { useDb } from '../hooks/DatabaseProvider';
 import { useQuery } from '../hooks/useQuery';
 import { useSettings } from '../hooks/useSettings';
 import { useSubmit } from '../hooks/useSubmit';
+import { PLAN_LABELS } from '../services/debts/recommender';
 import { addPlannedSpend, deletePlannedSpend, getDailyAllowance } from '../services/stats/dailyAllowanceService';
 import { addDays, formatDate, todayISO } from '../utils/dates';
 import { formatMoney } from '../utils/money';
@@ -41,9 +42,10 @@ export default function GASTO_DIARIO({ navigation }) {
   const { settings, periodSettings, update } = useSettings();
   const { submit, saving, errors } = useSubmit();
   const cushionSetting = settings ? settings['daily.cushion'] : 0;
+  const frequencies = settings ? settings['plan.frequency'] : null;
   const { data: a } = useQuery(
-    d => (periodSettings ? getDailyAllowance(d, { periodSettings, cushion: cushionSetting }) : Promise.resolve(null)),
-    [periodSettings, cushionSetting],
+    d => (periodSettings ? getDailyAllowance(d, { periodSettings, cushion: cushionSetting, frequencies }) : Promise.resolve(null)),
+    [periodSettings, cushionSetting, frequencies],
   );
   const [cushion, setCushion] = useState(null);
   const [planDate, setPlanDate] = useState(addDays(todayISO(), 1));
@@ -97,6 +99,11 @@ export default function GASTO_DIARIO({ navigation }) {
           Tu ingreso del {formatDate(a.pendingIncome.date, { withYear: false })} ({a.pendingIncome.name}) no se ha registrado: no cuenta hasta que lo confirmes en Ingresos.
         </AppText>
       ) : null}
+      {a.withoutPlan.length ? (
+        <AppText variant="small" color={colors.gold} style={styles.notice}>
+          Sin mensualidad capturada (no se incluye): {a.withoutPlan.join(', ')}. Captúrala en la deuda para que cuente.
+        </AppText>
+      ) : null}
       {a.horizonSource === 'period' ? (
         <AppText variant="small" color={colors.textSecondary} style={styles.notice}>
           No tienes un ingreso recurrente: se reparte hasta el fin del periodo. Configura tu salario en Ingresos para un cálculo más preciso.
@@ -107,18 +114,23 @@ export default function GASTO_DIARIO({ navigation }) {
       <Card animate={false}>
         <Line label="Dinero disponible" sub="Saldo líquido menos lo apartado" value={formatMoney(a.available)} />
         {a.commitments.map(c => (
-          <Line key={`${c.type}-${c.name}-${c.date}`} label={`− ${c.name}`} sub={`${COMMITMENT_LABEL[c.type]} · ${formatDate(c.date, { withYear: false })}`} value={formatMoney(c.amount)} color={colors.coral} />
+          <Line
+            key={`${c.type}-${c.name}-${c.date}`}
+            label={`− ${c.name}`}
+            sub={c.partial
+              ? `Apartar (${PLAN_LABELS[c.frequency].toLowerCase()}) para el pago del ${formatDate(c.date, { withYear: false })}`
+              : `${COMMITMENT_LABEL[c.type]} · ${formatDate(c.date, { withYear: false })}`}
+            value={formatMoney(c.amount)}
+            color={colors.coral}
+          />
         ))}
-        {a.cardSpending > 0 ? (
-          <Line label="− Compras con tarjeta" sub={`Desde el ${formatDate(a.cardSpendingSince, { withYear: false })}; se pagan después de tu ingreso`} value={formatMoney(a.cardSpending)} color={colors.coral} />
-        ) : null}
         {a.cushion > 0 ? <Line label="− Colchón" value={formatMoney(a.cushion)} color={colors.coral} /> : null}
         {a.plannedTotal > 0 ? <Line label="− Gastos planeados" value={formatMoney(a.plannedTotal)} color={colors.gold} /> : null}
         {a.spentToday > 0 ? <Line label="+ Lo que ya gastaste hoy" sub="Cuenta dentro de lo de hoy" value={formatMoney(a.spentToday)} /> : null}
         <Line label="Libre para repartir" value={formatMoney(Math.max(0, a.free - a.plannedTotal))} strong />
         <Line label={`÷ ${a.days} ${a.days === 1 ? 'día' : 'días'}`} sub={`Hasta ${horizonText}`} value={`${formatMoney(a.perDay)} al día`} strong color={colors.teal} />
         <AppText variant="caption" color={colors.textMuted} style={styles.mtSm}>
-          Se recalcula cada día: lo que gastes de más o de menos se reparte en los días que faltan. Las compras a meses no cuentan, cuenta su mensualidad.
+          Se recalcula cada día: lo que gastes de más o de menos se reparte en los días que faltan. De cada tarjeta y deuda se resta lo que toca apartar antes de tu ingreso, con el periodo que elegiste en su plan de pago; lo ya apartado cuenta primero.
         </AppText>
       </Card>
 

@@ -8,11 +8,12 @@ import { colors, spacing } from '../config/theme';
 import { ROUTES } from '../navigation/routes';
 import { useDb } from '../hooks/DatabaseProvider';
 import { useQuery } from '../hooks/useQuery';
+import { useSettings } from '../hooks/useSettings';
 import { useSubmit } from '../hooks/useSubmit';
 import { accountsRepository } from '../database/repositories/accountsRepository';
 import { deleteDebt, FINANCING_LABELS, getDebtDetail, reconcileDebt, registerDebtPayment, reserveForDebt, updateDebt } from '../services/debts/debtService';
 import { buildDebtContext } from '../services/debts/debtContext';
-import { pendingInstallments } from '../services/debts/recommender';
+import { pendingInstallments, planFrequency } from '../services/debts/recommender';
 import { refreshScheduledNotifications } from '../services/notifications/notificationService';
 import { formatDate, formatDateTime, nowDateTime, todayISO } from '../utils/dates';
 import { formatMoney } from '../utils/money';
@@ -52,6 +53,7 @@ export default function DEUDA_DETALLE({ navigation, route }) {
   const db = useDb();
   const id = route.params.id;
   const { data, loading } = useQuery(d => load(d, id), [id]);
+  const { settings, update } = useSettings();
   const { submit, saving, errors } = useSubmit();
   const [sheet, setSheet] = useState(null); // 'pay' | 'reserve' | 'release' | 'reconcile'
   const [amount, setAmount] = useState(null);
@@ -98,13 +100,17 @@ export default function DEUDA_DETALLE({ navigation, route }) {
       </AppText>
 
       <View style={styles.mtLg}>
-        <DebtPaymentPlan
-          debt={debt}
-          today={todayISO()}
-          context={data.context}
-          onReserve={perPeriod => open('reserve', perPeriod)}
-          onRegisterPayment={() => open('pay', debt.monthlyDue !== null ? debt.monthlyDue : outstanding)}
-        />
+        {settings ? (
+          <DebtPaymentPlan
+            debt={debt}
+            today={todayISO()}
+            context={data.context}
+            initialFrequency={planFrequency(settings['plan.frequency'], id, settings['period.type'])}
+            onFrequencyChange={f => update({ 'plan.frequency': { ...settings['plan.frequency'], [id]: f } })}
+            onReserve={perPeriod => open('reserve', perPeriod)}
+            onRegisterPayment={() => open('pay', debt.monthlyDue !== null ? debt.monthlyDue : outstanding)}
+          />
+        ) : null}
       </View>
 
       {debt.schedule ? <ScheduleCard debt={debt} /> : null}
