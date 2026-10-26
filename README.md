@@ -6,8 +6,7 @@ un círculo de gasto segmentado por categorías, deudas con recomendador de pago
 presupuestos, recurrencias, metas, estadísticas, CSV, biometría y notificaciones
 locales. Todos los datos se guardan solo en el teléfono.
 
-> Nombre provisional: se cambia en `config/brand.js` y en
-> `android/app/src/main/res/values/strings.xml`.
+
 
 ## Requisitos del entorno
 
